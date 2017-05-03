@@ -55,7 +55,7 @@ f, err := os.Open("my_data.txt")
 fatalIfErr(err)
 defer f.Close()
 r := siser.NewReader(f)
-for r.Read() {
+for r.ReadNext() {
   record := r.Record()
   // do something with the data
 }

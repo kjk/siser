@@ -46,6 +46,18 @@ func (r Record) Reset() Record {
 	return r[0:0]
 }
 
+// Get returns a value for a given key
+func (r Record) Get(key string) (string, bool) {
+	n := len(r)
+	for idx := 0; idx < n; {
+		if key == r[idx] {
+			return r[idx+1], true
+		}
+		idx += 2
+	}
+	return "", false
+}
+
 func isASCII(s string) bool {
 	n := len(s)
 	for i := 0; i < n; i++ {
@@ -98,9 +110,9 @@ func NewReader(r io.Reader) *Reader {
 	}
 }
 
-// Read reads next record from the reader, returns false
+// ReadNext reads next record from the reader, returns false
 // when no more records (error or reached end of file)
-func (r *Reader) Read() bool {
+func (r *Reader) ReadNext() bool {
 	r.rec, r.err = ReadRecord(r.br, r.rec)
 	if r.rec != nil {
 		fatalIfErr(r.err)
