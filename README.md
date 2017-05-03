@@ -3,12 +3,12 @@
 Package `siser` is a Simple Serialization library for Go
 
 Imagine you want to write many records of somewhat structured data
-to a file. Think of it as a helper for structured logging.
+to a file. Think of it as structured logging.
 
 You could use csv format, but csv values are identified by a position,
-not name.
+not name. They are also hard to read.
 
-You could serialize as json and write a line per json record, but
+You could serialize as json and write one line per json record but
 json isn't great for human readability (imagine you `tail -f` a log
 file with json records).
 
@@ -26,9 +26,9 @@ var r siser.Record
 func logHTTPRequest(w io.Writer, url string, ipAddr string, statusCode int) error {
   // for efficiency, you can re-use siser.Record across calls
   r = r.Reset()
-  // you can append multiple key/value paris ot once
+  // you can append multiple key/value pairs at once
   r = r.Append("url", url, "ipaddr", ipAddr)
-  // or spread over multiple parts
+  // or assemble with multiple calls
   r = r.Append("code", strconv.Itoa(statusCode))
   d := r.Marshal()
   _, err := w.Write(d)
@@ -116,3 +116,10 @@ format:
 ${key}:+${len(value)}\
 ${value}\n
 ```
+
+By design the format is easier to marshal/decode than e.g. json or csv.
+It doesn't need to quote the values and parsing is extremely simple.
+
+The downside is that unlike json it's not hierarchical. You could fake
+it a bit by encoding hierarchy in keys i.e. "person.name", "person.age"
+etc.
