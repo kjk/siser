@@ -18,18 +18,17 @@ func panicWithMsg(defaultMsg string, args ...interface{}) {
 	if s == "" {
 		s = defaultMsg
 	}
-	fmt.Printf("%s\n", s)
 	panic(s)
 }
 
-func fatalIfErr(err error, args ...interface{}) {
+func panicIfErr(err error, args ...interface{}) {
 	if err == nil {
 		return
 	}
 	panicWithMsg(err.Error(), args...)
 }
 
-func fatalIf(cond bool, args ...interface{}) {
+func panicIf(cond bool, args ...interface{}) {
 	if !cond {
 		return
 	}

@@ -31,8 +31,8 @@ type Record []string
 
 // Append adds key/value pairs to a record
 func (r Record) Append(args ...string) Record {
-	fatalIf(len(args) == 0, "Append requires multiple arguments")
-	fatalIf(len(args)%2 != 0, "Append requires even number of arguments")
+	panicIf(len(args) == 0, "Append requires multiple arguments")
+	panicIf(len(args)%2 != 0, "Append requires even number of arguments")
 	return append(r, args...)
 }
 
@@ -115,7 +115,7 @@ func NewReader(r io.Reader) *Reader {
 func (r *Reader) ReadNext() bool {
 	r.rec, r.err = ReadRecord(r.br, r.rec)
 	if r.rec != nil {
-		fatalIfErr(r.err)
+		panicIfErr(r.err)
 		return true
 	}
 	return false
