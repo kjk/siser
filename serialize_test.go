@@ -33,7 +33,7 @@ func bufReaderFromBytes(d []byte) *bufio.Reader {
 func testRoundTrip(t *testing.T, r Record) string {
 	d := r.Marshal()
 	br := bufReaderFromBytes(d)
-	r2, err := ReadRecord(br, nil)
+	_, r2, err := ReadRecord(br, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, r, r2)
 	return string(d)
@@ -64,6 +64,8 @@ func TestRecordSerializeSimple3(t *testing.T) {
 func TestMany(t *testing.T) {
 	w := &bytes.Buffer{}
 	var rec Record
+	var positions []int64
+	var currPos int64
 	for i := 0; i < 200; i++ {
 		rec = rec.Reset()
 		nRand := rand.Intn(1024)
@@ -76,15 +78,19 @@ func TestMany(t *testing.T) {
 				rec = rec.Append("after", "whatever")
 			}
 		}
-		_, err := w.Write(rec.Marshal())
+		n, err := w.Write(rec.Marshal())
 		assert.Nil(t, err)
+		positions = append(positions, currPos)
+		currPos += int64(n)
 	}
 
 	r := bytes.NewBuffer(w.Bytes())
 	reader := NewReader(r)
 	i := 0
+	var recPos int64
 	for reader.ReadNext() {
-		rec = reader.Record()
+		recPos, rec = reader.Record()
+		assert.Equal(t, positions[i], recPos)
 		counter, ok := rec.Get("counter")
 		assert.True(t, ok)
 		exp := strconv.Itoa(i)

@@ -100,6 +100,11 @@ type Reader struct {
 	br  *bufio.Reader
 	rec Record
 	err error
+	// position of the current record within the reader. It will match
+	// position within the reader if we start reading from the beginning
+	// this is needed for cases where we want to seek to a given record
+	currRecPos int64
+	nextRecPos int64
 }
 
 // NewReader creates a new reader
@@ -113,7 +118,10 @@ func NewReader(r io.Reader) *Reader {
 // ReadNext reads next record from the reader, returns false
 // when no more records (error or reached end of file)
 func (r *Reader) ReadNext() bool {
-	r.rec, r.err = ReadRecord(r.br, r.rec)
+	var n int
+	r.currRecPos = r.nextRecPos
+	n, r.rec, r.err = ReadRecord(r.br, r.rec)
+	r.nextRecPos += int64(n)
 	if r.rec != nil {
 		panicIfErr(r.err)
 		return true
@@ -122,8 +130,8 @@ func (r *Reader) ReadNext() bool {
 }
 
 // Record returns record from last Read
-func (r *Reader) Record() Record {
-	return r.rec
+func (r *Reader) Record() (int64, Record) {
+	return r.currRecPos, r.rec
 }
 
 // Err returns error from last Read. We swallow io.EOF to make it easier
@@ -140,37 +148,40 @@ func (r *Reader) Err() error {
 // We need bufio.Reader here for efficient reading of lines
 // with occasional reads of raw bytes.
 // Record is passed in so that it can be re-used
-func ReadRecord(r *bufio.Reader, rec Record) (Record, error) {
+func ReadRecord(r *bufio.Reader, rec Record) (int, Record, error) {
 	var line string
+	nBytesRead := 0
 	rec = rec.Reset()
 	var err error
 	for {
 		line, err = r.ReadString('\n')
 		if err == io.EOF {
 			if len(rec) > 0 {
-				return nil, fmt.Errorf("half-read records %v", rec)
+				return 0, nil, fmt.Errorf("half-read records %v", rec)
 			}
-			return nil, nil
+			return 0, nil, nil
 		}
 		if err != nil {
-			return nil, err
+			return 0, nil, err
 		}
 		n := len(line)
-		if n < 3 {
-			return nil, fmt.Errorf("line in unrecognized format: '%s'", line)
+		nBytesRead += n
+		if n < 3 || line[n-1] != '\n' {
+			return 0, nil, fmt.Errorf("line in unrecognized format: '%s'", line)
 		}
+		// strip '\n' from the end
 		line = line[:n-1]
 		if line == recordSeparator {
-			return rec, nil
+			return nBytesRead, rec, nil
 		}
 		parts := strings.SplitN(line, ":", 2)
 		if len(parts) != 2 {
-			return nil, fmt.Errorf("line in unrecognized format: '%s'", line)
+			return 0, nil, fmt.Errorf("line in unrecognized format: '%s'", line)
 		}
 		key := parts[0]
 		val := parts[1]
 		if len(val) < 1 {
-			return nil, fmt.Errorf("line in unrecognized format: '%s'", line)
+			return 0, nil, fmt.Errorf("line in unrecognized format: '%s'", line)
 		}
 		typ := val[0]
 		val = val[1:]
@@ -180,21 +191,22 @@ func ReadRecord(r *bufio.Reader, rec Record) (Record, error) {
 		}
 
 		if typ != '+' {
-			return nil, fmt.Errorf("line in unrecognized format: '%s'", line)
+			return 0, nil, fmt.Errorf("line in unrecognized format: '%s'", line)
 		}
 		n, err := strconv.Atoi(val)
 		if err != nil {
-			return nil, err
+			return 0, nil, err
 		}
 		// account for '\n'
 		n++
 		d := make([]byte, n, n)
 		n, err = r.Read(d)
+		nBytesRead += n
 		if err != nil {
-			return nil, err
+			return 0, nil, err
 		}
 		if n != len(d) {
-			return nil, fmt.Errorf("wanted to read %d but read %d bytes", len(d), n)
+			return 0, nil, fmt.Errorf("wanted to read %d but read %d bytes", len(d), n)
 		}
 		val = string(d[:n-1])
 		rec = rec.Append(key, val)
