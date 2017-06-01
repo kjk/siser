@@ -200,7 +200,7 @@ func ReadRecord(r *bufio.Reader, rec Record) (int, Record, error) {
 		// account for '\n'
 		n++
 		d := make([]byte, n, n)
-		n, err = r.Read(d)
+		n, err = io.ReadFull(r, d)
 		nBytesRead += n
 		if err != nil {
 			return 0, nil, err
