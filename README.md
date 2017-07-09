@@ -22,17 +22,15 @@ This library is meant to be a middle ground:
 Imagine you want log basic info about http requests.
 
 ```go
-var r siser.Record
 func logHTTPRequest(w io.Writer, url string, ipAddr string, statusCode int) error {
-  // for efficiency, you can re-use siser.Record across calls
-  r = r.Reset()
-  // you can append multiple key/value pairs at once
-  r = r.Append("url", url, "ipaddr", ipAddr)
-  // or assemble with multiple calls
-  r = r.Append("code", strconv.Itoa(statusCode))
-  d := r.Marshal()
-  _, err := w.Write(d)
-  return err
+	var r siser.Record
+	// you can append multiple key/value pairs at once
+	r.Append("url", url, "ipaddr", ipAddr)
+	// or assemble with multiple calls
+	r.Append("code", strconv.Itoa(statusCode))
+	d := r.Marshal()
+	_, err := w.Write(d)
+	return err
 }
 ```
 
@@ -49,15 +47,16 @@ http requests. The good thing about this format is that it can be used
 for arbitrary data that can be represented as key/value pairs
 
 We also need to read the data back. Let's assume you wrote the data to
-a file `my_data.txt`. To read all records from the file:
+a file `http_access.log`. To read all records from the file:
 ```go
-f, err := os.Open("my_data.txt")
+f, err := os.Open("http_access.log")
 fatalIfErr(err)
 defer f.Close()
 r := siser.NewReader(f)
 for r.ReadNext() {
-  record := r.Record()
-  // do something with the data
+	record := r.Record()
+	code, ok := r.Get("code")
+	// get rest of values and do something with them
 }
 fatalIfErr(r.Err())
 ```
@@ -83,43 +82,26 @@ how much time an average conversion takes etc.
 
 ## Performance and implementation notes
 
-I'm not doing anything crazy. The format is designed to be simple
-to implement in efficient way. Howerver, some implementation decisions
-were made with performance in mind.
+Some implementation decisions were made with performance in mind.
 
-`siser.Record` is an alias for `[]string`. You might expect this to
-be `map[string]string` but `[]string` is more efficient for small
-number of entries.
+Given key/value nature of the record, an easy choice would be to use map[string]string as source to encode/decode functions.
 
-This is why you have to use slice-like `r = r.Append("key", "val")` pattern.
+However `[]string` is more efficient than a `map`. Additionally, a slice can be reused across multiple records. We can clear it by setting the size to zero and reuse the underlying array. A map would require allocating a new instance for each record, which would create a lot of work for garbage collector.
 
-`siser.Record` can also be re-used across calls to `Marshal`. Thanks to
-using a slice we can have `r = r.Reset()` call which re-uses underlying
-array. Imagine you serialize 1.000 records. With re-use you only allocate
-one `[]string` slice compared to making 1.000 allocations.
+When serializing, you need to use `Reset` method to get the benefit of efficient re-use of the `Record`.
 
-`siser.Reader` takes advantage for this optimization when reading
-multiple records from a file.
+When reading and deserializing records, `siser.Reader` uses this optimization internally.
 
-The format is binary-safe and works for serializing large values e.g.
-you can use png image as value.
+The format avoids the need for escaping keys and values, which helps in making encoding/decoding fast.
 
-The value is a string but in Go a string can have arbitrary binary data
-in it. A small (<120 bytes) ascii value is serialized as a single line:
+How does that play out in real life? I wrote a benchmark comparing siser vs. json.Marshal. It’s about 30% faster:
+
 ```
-${key}: ${value}\n
+$ go test -bench=.
+BenchmarkSiserMarshal-8   	 1000000	      1903 ns/op
+BenchmarkJSONMarshal-8    	  500000	      2905 ns/op
 ```
 
-When value is large or has non-ascii characters, we use a slightly different
-format:
-```
-${key}:+${len(value)}\
-${value}\n
-```
+The format is binary-safe and works for serializing large values e.g. you can use png image as value.
 
-By design the format is easier to marshal/decode than e.g. json or csv.
-It doesn't need to quote the values and parsing is extremely simple.
-
-The downside is that unlike json it's not hierarchical. You could fake
-it a bit by encoding hierarchy in keys i.e. "person.name", "person.age"
-etc.
+It’s also very easy to implement in any language.
