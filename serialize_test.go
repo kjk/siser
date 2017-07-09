@@ -32,52 +32,53 @@ func bufReaderFromBytes(d []byte) *bufio.Reader {
 	return bufio.NewReader(r)
 }
 
-func testRoundTrip(t *testing.T, r Record) string {
+func testRoundTrip(t *testing.T, r *Record) string {
 	d := r.Marshal()
 	br := bufReaderFromBytes(d)
-	_, r2, err := ReadRecord(br, nil)
+	rec := Record{}
+	_, data, err := ReadRecord(br, &rec)
 	assert.Nil(t, err)
-	assert.Equal(t, r, r2)
+	assert.Equal(t, r.data, data)
 	return string(d)
 }
 
 func TestRecordSerializeSimple(t *testing.T) {
 	var r Record
-	r = r.Append("key", "val")
-	s := testRoundTrip(t, r)
+	r.Append("key", "val")
+	s := testRoundTrip(t, &r)
 	assert.Equal(t, "key: val\n---\n", s)
 }
 
 func TestRecordSerializeSimple2(t *testing.T) {
 	var r Record
-	r = r.Append("k2", "a\nb")
-	s := testRoundTrip(t, r)
+	r.Append("k2", "a\nb")
+	s := testRoundTrip(t, &r)
 	assert.Equal(t, "k2:+3\na\nb\n---\n", s)
 }
 
 func TestRecordSerializeSimple3(t *testing.T) {
 	var r Record
-	r = r.Append("long key", largeValue)
-	got := testRoundTrip(t, r)
+	r.Append("long key", largeValue)
+	got := testRoundTrip(t, &r)
 	exp := fmt.Sprintf("long key:+%d\n%s\n---\n", len(largeValue), largeValue)
 	assert.Equal(t, exp, got)
 }
 
 func TestMany(t *testing.T) {
 	w := &bytes.Buffer{}
-	var rec Record
+	rec := &Record{}
 	var positions []int64
 	var currPos int64
 	for i := 0; i < 200; i++ {
-		rec = rec.Reset()
+		rec.Reset()
 		nRand := rand.Intn(1024)
-		rec = rec.Append("counter", strconv.Itoa(i), "random", strconv.Itoa(nRand))
+		rec.Append("counter", strconv.Itoa(i), "random", strconv.Itoa(nRand))
 		if i%12 == 0 {
-			rec = rec.Append("large", largeValue)
+			rec.Append("large", largeValue)
 			// test a case where large value is last in the record as well
 			// as being followed by another value
 			if rand.Intn(1024) > 512 {
-				rec = rec.Append("after", "whatever")
+				rec.Append("after", "whatever")
 			}
 		}
 		n, err := w.Write(rec.Marshal())
@@ -130,17 +131,17 @@ type testRecJSON struct {
 
 func BenchmarkSiserMarshal(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		rec = rec.Reset()
-		rec = rec.Append("uri", "/atom.xml")
-		rec = rec.Append("code", strconv.Itoa(200))
-		rec = rec.Append("ip", "54.186.248.49")
+		rec.Reset()
+		rec.Append("uri", "/atom.xml")
+		rec.Append("code", strconv.Itoa(200))
+		rec.Append("ip", "54.186.248.49")
 		durMs := float64(1.41) / float64(time.Millisecond)
 		durStr := strconv.FormatFloat(durMs, 'f', 2, 64)
-		rec = rec.Append("dur", durStr)
-		rec = rec.Append("when", time.Now().Format(time.RFC3339))
-		rec = rec.Append("size", strconv.Itoa(35286))
-		rec = rec.Append("ua", "Feedspot http://www.feedspot.com")
-		rec = rec.Append("referer", "http://blog.kowalczyk.info/feed")
+		rec.Append("dur", durStr)
+		rec.Append("when", time.Now().Format(time.RFC3339))
+		rec.Append("size", strconv.Itoa(35286))
+		rec.Append("ua", "Feedspot http://www.feedspot.com")
+		rec.Append("referer", "http://blog.kowalczyk.info/feed")
 		// assign to global to prevents optimizing the loop
 		globalData = rec.Marshal()
 	}

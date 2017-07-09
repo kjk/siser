@@ -2,6 +2,7 @@ package siser
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"strconv"
@@ -27,31 +28,34 @@ const (
 
 // Record represents list of key/value pairs that can
 // be serialized/descerialized
-type Record []string
+type Record struct {
+	data []string
+	buf  bytes.Buffer
+}
 
 // Append adds key/value pairs to a record
-func (r Record) Append(args ...string) Record {
-	panicIf(len(args) == 0, "Append requires multiple arguments")
-	panicIf(len(args)%2 != 0, "Append requires even number of arguments")
-	return append(r, args...)
+func (r *Record) Append(args ...string) {
+	if len(args) == 0 || len(args)%2 != 0 {
+		panic(fmt.Sprintf("Invalid number of args: %d", len(args)))
+	}
+	r.data = append(r.data, args...)
 }
 
 // Reset makes it easy to re-use Record (as opposed to allocating a new one
 // each time)
-func (r Record) Reset() Record {
-	if len(r) == 0 {
-		// r can be nil
-		return r
+func (r *Record) Reset() {
+	if r.data != nil {
+		r.data = r.data[0:0]
 	}
-	return r[0:0]
 }
 
 // Get returns a value for a given key
-func (r Record) Get(key string) (string, bool) {
-	n := len(r)
+func (r *Record) Get(key string) (string, bool) {
+	data := r.data
+	n := len(data)
 	for idx := 0; idx < n; {
-		if key == r[idx] {
-			return r[idx+1], true
+		if key == data[idx] {
+			return data[idx+1], true
 		}
 		idx += 2
 	}
@@ -69,28 +73,39 @@ func isASCII(s string) bool {
 	return true
 }
 
+var (
+	sepLargeVal = []byte{':', '+'}
+	sepSmallVal = []byte{':', ' '}
+)
+
 // Marshal converts to a byte array
-func (r Record) Marshal() []byte {
-	n := len(r)
+func (r *Record) Marshal() []byte {
+	data := r.data
+	n := len(data)
 	if n == 0 {
 		return nil
 	}
-	var lines []string
+	buf := r.buf
+	buf.Truncate(0)
 	for i := 0; i < n/2; i++ {
-		key := r[i*2]
-		val := r[i*2+1]
+		key := data[i*2]
+		val := data[i*2+1]
 		asData := len(val) > 120 || !isASCII(val)
-		var l string
+		buf.WriteString(key)
 		if asData {
-			l = fmt.Sprintf("%s:+%d\n%s", key, len(val), val)
+			buf.Write(sepLargeVal)
+			buf.WriteString(strconv.Itoa(len(val)))
+			buf.WriteByte('\n')
 		} else {
-			l = fmt.Sprintf("%s: %s", key, val)
+			buf.Write(sepSmallVal)
 		}
-		lines = append(lines, l)
+		buf.WriteString(val)
+		buf.WriteByte('\n')
+
 	}
-	lines = append(lines, recordSeparator)
-	s := strings.Join(lines, "\n") + "\n"
-	return []byte(s)
+	buf.WriteString(recordSeparator)
+	buf.WriteString("\n")
+	return buf.Bytes()
 }
 
 // Reader is for reading (deserializing) records
@@ -118,20 +133,28 @@ func NewReader(r io.Reader) *Reader {
 // ReadNext reads next record from the reader, returns false
 // when no more records (error or reached end of file)
 func (r *Reader) ReadNext() bool {
+	if r.err != nil {
+		return false
+	}
 	var n int
+	var dataTmp []string
 	r.currRecPos = r.nextRecPos
-	n, r.rec, r.err = ReadRecord(r.br, r.rec)
+	n, dataTmp, r.err = ReadRecord(r.br, &r.rec)
 	r.nextRecPos += int64(n)
-	if r.rec != nil {
+	if r.err != nil {
+		return false
+	}
+	if dataTmp != nil {
+		panicIf(n == 0, "n: %d", n)
 		panicIfErr(r.err)
 		return true
 	}
 	return false
 }
 
-// Record returns record from last Read
-func (r *Reader) Record() (int64, Record) {
-	return r.currRecPos, r.rec
+// Record returns data from last Read
+func (r *Reader) Record() (int64, *Record) {
+	return r.currRecPos, &r.rec
 }
 
 // Err returns error from last Read. We swallow io.EOF to make it easier
@@ -148,16 +171,21 @@ func (r *Reader) Err() error {
 // We need bufio.Reader here for efficient reading of lines
 // with occasional reads of raw bytes.
 // Record is passed in so that it can be re-used
-func ReadRecord(r *bufio.Reader, rec Record) (int, Record, error) {
+func ReadRecord(r *bufio.Reader, record *Record) (int, []string, error) {
 	var line string
 	nBytesRead := 0
-	rec = rec.Reset()
+	record.Reset()
+	data := record.data
+	defer func() {
+		record.data = data
+	}()
+
 	var err error
 	for {
 		line, err = r.ReadString('\n')
 		if err == io.EOF {
-			if len(rec) > 0 {
-				return 0, nil, fmt.Errorf("half-read records %v", rec)
+			if len(data) > 0 {
+				return 0, nil, fmt.Errorf("half-read record %v", data)
 			}
 			return 0, nil, nil
 		}
@@ -172,7 +200,7 @@ func ReadRecord(r *bufio.Reader, rec Record) (int, Record, error) {
 		// strip '\n' from the end
 		line = line[:n-1]
 		if line == recordSeparator {
-			return nBytesRead, rec, nil
+			return nBytesRead, data, nil
 		}
 		parts := strings.SplitN(line, ":", 2)
 		if len(parts) != 2 {
@@ -186,7 +214,7 @@ func ReadRecord(r *bufio.Reader, rec Record) (int, Record, error) {
 		typ := val[0]
 		val = val[1:]
 		if typ == ' ' {
-			rec = rec.Append(key, val)
+			data = append(data, key, val)
 			continue
 		}
 
@@ -209,6 +237,6 @@ func ReadRecord(r *bufio.Reader, rec Record) (int, Record, error) {
 			return 0, nil, fmt.Errorf("wanted to read %d but read %d bytes", len(d), n)
 		}
 		val = string(d[:n-1])
-		rec = rec.Append(key, val)
+		data = append(data, key, val)
 	}
 }
