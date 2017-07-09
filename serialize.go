@@ -78,8 +78,8 @@ var (
 	sepSmallVal = []byte{':', ' '}
 )
 
-// Marshal converts to a byte array
-func (r *Record) Marshal() []byte {
+// MarshalOld converts to a byte array
+func (r *Record) MarshalOld() []byte {
 	data := r.data
 	n := len(data)
 	if n == 0 {
@@ -106,6 +106,64 @@ func (r *Record) Marshal() []byte {
 	buf.WriteString(recordSeparator)
 	buf.WriteString("\n")
 	return buf.Bytes()
+}
+
+// Marshal converts to a byte array
+func (r *Record) Marshal() []byte {
+	data := r.data
+	nValues := len(data)
+	if nValues == 0 {
+		return nil
+	}
+	n := 0
+	for i := 0; i < nValues/2; i++ {
+		key := data[i*2]
+		val := data[i*2+1]
+		asData := len(val) > 120 || !isASCII(val)
+
+		n += len(key) + 2 // +2 for separator
+		if asData {
+			s := strconv.Itoa(len(val))
+			n += len(s) + 1 // +1 for '\n'
+		}
+		n += len(val) + 1 // +1 for '\n'
+	}
+	n += len(recordSeparator) + 1 // +1 for '\n'
+
+	buf := make([]byte, n, n)
+	pos := 0
+	for i := 0; i < nValues/2; i++ {
+		key := data[i*2]
+		val := data[i*2+1]
+		asData := len(val) > 120 || !isASCII(val)
+		copy(buf[pos:], key)
+		pos += len(key)
+		buf[pos] = ':'
+		pos++
+		if asData {
+			buf[pos] = '+'
+			pos++
+			s := strconv.Itoa(len(val))
+			copy(buf[pos:], s)
+			pos += len(s)
+			buf[pos] = '\n'
+			pos++
+		} else {
+			buf[pos] = ' '
+			pos++
+		}
+		copy(buf[pos:], val)
+		pos += len(val)
+		buf[pos] = '\n'
+		pos++
+	}
+	buf[pos] = '-'
+	buf[pos+1] = '-'
+	buf[pos+2] = '-'
+	buf[pos+3] = '\n'
+	pos += 4
+	panicIf(pos != n)
+	return buf
 }
 
 // Reader is for reading (deserializing) records
