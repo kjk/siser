@@ -3,10 +3,12 @@ package siser
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -98,5 +100,67 @@ func TestMany(t *testing.T) {
 		_, ok = rec.Get("random")
 		assert.True(t, ok)
 		i++
+	}
+}
+
+/*
+uri: /atom.xml
+code: 200
+ip: 54.186.248.49
+dur: 1.41
+when: 2017-07-09T05:26:55Z
+size: 35286
+ua: Feedspot http://www.feedspot.com
+referer: http://blog.kowalczyk.info/feed
+*/
+
+var rec Record
+var globalData []byte
+
+type testRecJSON struct {
+	URI       string        `json:"uri"`
+	Code      int           `json:"code"`
+	IP        string        `json:"ip"`
+	Duration  time.Duration `json:"dur"`
+	When      time.Time     `json:"when"`
+	Size      int           `json:"size"`
+	UserAgent string        `json:"ua"`
+	Referer   string        `json:"referer"`
+}
+
+func BenchmarkSiserMarshal(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		rec = rec.Reset()
+		rec = rec.Append("uri", "/atom.xml")
+		rec = rec.Append("code", strconv.Itoa(200))
+		rec = rec.Append("ip", "54.186.248.49")
+		durMs := float64(1.41) / float64(time.Millisecond)
+		durStr := strconv.FormatFloat(durMs, 'f', 2, 64)
+		rec = rec.Append("dur", durStr)
+		rec = rec.Append("when", time.Now().Format(time.RFC3339))
+		rec = rec.Append("size", strconv.Itoa(35286))
+		rec = rec.Append("ua", "Feedspot http://www.feedspot.com")
+		rec = rec.Append("referer", "http://blog.kowalczyk.info/feed")
+		// assign to global to prevents optimizing the loop
+		globalData = rec.Marshal()
+	}
+}
+
+func BenchmarkJSONMarshal(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		rec := testRecJSON{
+			URI:       "/atom.xml",
+			Code:      200,
+			IP:        "54.186.248.49",
+			Duration:  time.Microsecond * time.Duration(1410),
+			When:      time.Now(),
+			Size:      35286,
+			UserAgent: "Feedspot http://www.feedspot.com",
+			Referer:   "http://blog.kowalczyk.info/feed",
+		}
+		d, err := json.Marshal(rec)
+		panicIfErr(err)
+		// assign to global to prevents optimizing the loop
+		globalData = d
 	}
 }
