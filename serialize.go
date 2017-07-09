@@ -2,7 +2,6 @@ package siser
 
 import (
 	"bufio"
-	"bytes"
 	"fmt"
 	"io"
 	"strconv"
@@ -30,7 +29,6 @@ const (
 // be serialized/descerialized
 type Record struct {
 	data []string
-	buf  bytes.Buffer
 }
 
 // Append adds key/value pairs to a record
@@ -71,41 +69,6 @@ func isASCII(s string) bool {
 		}
 	}
 	return true
-}
-
-var (
-	sepLargeVal = []byte{':', '+'}
-	sepSmallVal = []byte{':', ' '}
-)
-
-// MarshalOld converts to a byte array
-func (r *Record) MarshalOld() []byte {
-	data := r.data
-	n := len(data)
-	if n == 0 {
-		return nil
-	}
-	buf := r.buf
-	buf.Truncate(0)
-	for i := 0; i < n/2; i++ {
-		key := data[i*2]
-		val := data[i*2+1]
-		asData := len(val) > 120 || !isASCII(val)
-		buf.WriteString(key)
-		if asData {
-			buf.Write(sepLargeVal)
-			buf.WriteString(strconv.Itoa(len(val)))
-			buf.WriteByte('\n')
-		} else {
-			buf.Write(sepSmallVal)
-		}
-		buf.WriteString(val)
-		buf.WriteByte('\n')
-
-	}
-	buf.WriteString(recordSeparator)
-	buf.WriteString("\n")
-	return buf.Bytes()
 }
 
 // Marshal converts to a byte array

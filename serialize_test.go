@@ -147,23 +147,6 @@ func BenchmarkSiserMarshal(b *testing.B) {
 	}
 }
 
-func BenchmarkSiserMarshalOld(b *testing.B) {
-	for n := 0; n < b.N; n++ {
-		rec.Reset()
-		rec.Append("uri", "/atom.xml")
-		rec.Append("code", strconv.Itoa(200))
-		rec.Append("ip", "54.186.248.49")
-		durMs := float64(1.41) / float64(time.Millisecond)
-		durStr := strconv.FormatFloat(durMs, 'f', 2, 64)
-		rec.Append("dur", durStr)
-		rec.Append("when", time.Now().Format(time.RFC3339))
-		rec.Append("size", strconv.Itoa(35286))
-		rec.Append("ua", "Feedspot http://www.feedspot.com")
-		rec.Append("referer", "http://blog.kowalczyk.info/feed")
-		// assign to global to prevents optimizing the loop
-		globalData = rec.MarshalOld()
-	}
-}
 func BenchmarkJSONMarshal(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		rec := testRecJSON{
