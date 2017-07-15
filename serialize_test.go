@@ -14,10 +14,12 @@ import (
 )
 
 var (
-	largeValue = ""
+	largeValue      = ""
+	serializedJSON  []byte
+	serializedSiser []byte
 )
 
-func init() {
+func genLargeValue() {
 	s := "0123456789"
 	s += s // 20
 	s += s // 40
@@ -25,6 +27,43 @@ func init() {
 	s += s // 160
 	s += s // 320
 	largeValue = s
+}
+
+func genSerializedSiser() {
+	var rec Record
+	rec.Append("uri", "/atom.xml")
+	rec.Append("code", strconv.Itoa(200))
+	rec.Append("ip", "54.186.248.49")
+	durMs := float64(1.41) / float64(time.Millisecond)
+	durStr := strconv.FormatFloat(durMs, 'f', 2, 64)
+	rec.Append("dur", durStr)
+	rec.Append("when", time.Now().Format(time.RFC3339))
+	rec.Append("size", strconv.Itoa(35286))
+	rec.Append("ua", "Feedspot http://www.feedspot.com")
+	rec.Append("referer", "http://blog.kowalczyk.info/feed")
+	serializedSiser = rec.Marshal()
+}
+
+func genSerializedJSON() {
+	rec := testRecJSON{
+		URI:       "/atom.xml",
+		Code:      200,
+		IP:        "54.186.248.49",
+		Duration:  time.Microsecond * time.Duration(1410),
+		When:      time.Now(),
+		Size:      35286,
+		UserAgent: "Feedspot http://www.feedspot.com",
+		Referer:   "http://blog.kowalczyk.info/feed",
+	}
+	d, err := json.Marshal(rec)
+	panicIfErr(err)
+	serializedJSON = d
+}
+
+func init() {
+	genLargeValue()
+	genSerializedSiser()
+	genSerializedJSON()
 }
 
 func bufReaderFromBytes(d []byte) *bufio.Reader {
@@ -163,5 +202,27 @@ func BenchmarkJSONMarshal(b *testing.B) {
 		panicIfErr(err)
 		// assign to global to prevents optimizing the loop
 		globalData = d
+	}
+}
+
+var (
+	lines []string
+)
+
+func BenchmarkSiserUnmarshal(b *testing.B) {
+	var rec Record
+	var err error
+	for n := 0; n < b.N; n++ {
+		r := bufio.NewReader(bytes.NewBuffer(serializedSiser))
+		_, lines, err = ReadRecord(r, &rec)
+		panicIfErr(err)
+	}
+}
+
+func BenchmarkJSONUnmarshal(b *testing.B) {
+	var rec testRecJSON
+	for n := 0; n < b.N; n++ {
+		err := json.Unmarshal(serializedJSON, &rec)
+		panicIfErr(err)
 	}
 }
