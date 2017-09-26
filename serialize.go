@@ -173,7 +173,8 @@ func (r *Reader) ReadNext() bool {
 	return false
 }
 
-// Record returns data from last Read
+// Record returns information from last Read. Returns offset of the record
+// (offset starts at 0 when NewReader is called) and record itself
 func (r *Reader) Record() (int64, *Record) {
 	return r.currRecPos, &r.rec
 }
