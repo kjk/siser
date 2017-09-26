@@ -22,40 +22,57 @@ Records are separated by "---\n""
 */
 
 const (
-	recordSeparator = "---"
+	recordSeparatorWithNL = "---\n"
 )
 
 // Record represents list of key/value pairs that can
 // be serialized/descerialized
 type Record struct {
-	data []string
+	// Keys contains record keys
+	Keys []string
+	// Values contains value for corresponding key in Keys
+	Values []string
 }
 
 // Append adds key/value pairs to a record
 func (r *Record) Append(args ...string) {
-	if len(args) == 0 || len(args)%2 != 0 {
+	n := len(args)
+	if n == 0 || n%2 != 0 {
 		panic(fmt.Sprintf("Invalid number of args: %d", len(args)))
 	}
-	r.data = append(r.data, args...)
+	for i := 0; i < n; i += 2 {
+		r.Keys = append(r.Keys, args[i])
+		r.Values = append(r.Values, args[i+1])
+	}
+}
+
+func resetStringArray(a []string) []string {
+	if a == nil {
+		return nil
+	}
+	n := len(a)
+	// avoid unwanted retaining of large strings
+	for i := 0; i < n; i++ {
+		a[i] = ""
+	}
+	return a[0:0]
 }
 
 // Reset makes it easy to re-use Record (as opposed to allocating a new one
 // each time)
 func (r *Record) Reset() {
-	if r.data != nil {
-		r.data = r.data[0:0]
-	}
+	r.Keys = resetStringArray(r.Keys)
+	r.Values = resetStringArray(r.Values)
 }
 
 // Get returns a value for a given key
 func (r *Record) Get(key string) (string, bool) {
-	data := r.data
-	n := len(data)
-	for idx := 0; idx < n; {
-		if key == data[idx] {
-			return data[idx+1], true
+	keys := r.Keys
+	n := len(keys)
+	for i := 0; i < n; i++ {
+		if key == keys[i] {
+			return r.Values[i], true
 		}
-		idx += 2
 	}
 	return "", false
 }
@@ -71,17 +88,43 @@ func isASCII(s string) bool {
 	return true
 }
 
+// intStrLen calculates how long n would be when converted to a string
+// i.e. equivalent of len(strconv.Itoa(n)) but faster
+func intStrLen(n int) int {
+	l := 1 // count the last digit here
+	if n < 0 {
+		n = -n
+		l = 2
+	}
+	if n <= 9 {
+		return l
+	}
+	if n <= 99 {
+		return l + 1
+	}
+	if n <= 999 {
+		return l + 2
+	}
+	for n > 999 {
+		l++
+		n = n / 10
+	}
+	return l + 2
+}
+
 // Marshal converts to a byte array
 func (r *Record) Marshal() []byte {
-	data := r.data
-	nValues := len(data)
+	keys := r.Keys
+	vals := r.Values
+	nValues := len(keys)
 	if nValues == 0 {
 		return nil
 	}
+	// calculate size of serialized data so that we can pre-allocate buffer
 	n := 0
-	for i := 0; i < nValues/2; i++ {
-		key := data[i*2]
-		val := data[i*2+1]
+	for i := 0; i < nValues; i++ {
+		key := keys[i]
+		val := vals[i]
 		asData := len(val) > 120 || !isASCII(val)
 
 		n += len(key) + 2 // +2 for separator
@@ -91,13 +134,13 @@ func (r *Record) Marshal() []byte {
 		}
 		n += len(val) + 1 // +1 for '\n'
 	}
-	n += len(recordSeparator) + 1 // +1 for '\n'
-
+	n += len(recordSeparatorWithNL) // +1 for '\n'
 	buf := make([]byte, n, n)
+
 	pos := 0
-	for i := 0; i < nValues/2; i++ {
-		key := data[i*2]
-		val := data[i*2+1]
+	for i := 0; i < nValues; i++ {
+		key := keys[i]
+		val := vals[i]
 		asData := len(val) > 120 || !isASCII(val)
 		copy(buf[pos:], key)
 		pos += len(key)
@@ -120,11 +163,8 @@ func (r *Record) Marshal() []byte {
 		buf[pos] = '\n'
 		pos++
 	}
-	buf[pos] = '-'
-	buf[pos+1] = '-'
-	buf[pos+2] = '-'
-	buf[pos+3] = '\n'
-	pos += 4
+	copy(buf[pos:], recordSeparatorWithNL)
+	pos += len(recordSeparatorWithNL)
 	panicIf(pos != n)
 	return buf
 }
@@ -158,19 +198,13 @@ func (r *Reader) ReadNext() bool {
 		return false
 	}
 	var n int
-	var dataTmp []string
 	r.currRecPos = r.nextRecPos
-	n, dataTmp, r.err = ReadRecord(r.br, &r.rec)
+	n, r.err = ReadRecord(r.br, &r.rec)
 	r.nextRecPos += int64(n)
 	if r.err != nil {
 		return false
 	}
-	if dataTmp != nil {
-		panicIf(n == 0, "n: %d", n)
-		panicIfErr(r.err)
-		return true
-	}
-	return false
+	return true
 }
 
 // Record returns information from last ReadNext. Returns offset of the record
@@ -193,59 +227,55 @@ func (r *Reader) Err() error {
 // We need bufio.Reader here for efficient reading of lines
 // with occasional reads of raw bytes.
 // Record is passed in so that it can be re-used
-func ReadRecord(r *bufio.Reader, record *Record) (int, []string, error) {
+func ReadRecord(r *bufio.Reader, rec *Record) (int, error) {
 	var line string
 	nBytesRead := 0
-	record.Reset()
-	data := record.data
-	defer func() {
-		record.data = data
-	}()
-
+	rec.Reset()
 	var err error
 	for {
 		line, err = r.ReadString('\n')
 		if err == io.EOF {
-			if len(data) > 0 {
-				return 0, nil, fmt.Errorf("half-read record %v", data)
+			if len(rec.Keys) > 0 {
+				return 0, fmt.Errorf("half-read record %v", rec.Keys)
 			}
-			return 0, nil, nil
+			return 0, io.EOF
 		}
 		if err != nil {
-			return 0, nil, err
+			return 0, err
 		}
 		n := len(line)
 		nBytesRead += n
 		if n < 3 || line[n-1] != '\n' {
-			return 0, nil, fmt.Errorf("line in unrecognized format: '%s'", line)
+			return 0, fmt.Errorf("line in unrecognized format: '%s'", line)
+		}
+		if line == recordSeparatorWithNL {
+			return nBytesRead, nil
 		}
 		// strip '\n' from the end
 		line = line[:n-1]
-		if line == recordSeparator {
-			return nBytesRead, data, nil
-		}
 		parts := strings.SplitN(line, ":", 2)
 		if len(parts) != 2 {
-			return 0, nil, fmt.Errorf("line in unrecognized format: '%s'", line)
+			return 0, fmt.Errorf("line in unrecognized format: '%s'", line)
 		}
 		key := parts[0]
 		val := parts[1]
 		if len(val) < 1 {
-			return 0, nil, fmt.Errorf("line in unrecognized format: '%s'", line)
+			return 0, fmt.Errorf("line in unrecognized format: '%s'", line)
 		}
 		typ := val[0]
 		val = val[1:]
 		if typ == ' ' {
-			data = append(data, key, val)
+			rec.Keys = append(rec.Keys, key)
+			rec.Values = append(rec.Values, val)
 			continue
 		}
 
 		if typ != '+' {
-			return 0, nil, fmt.Errorf("line in unrecognized format: '%s'", line)
+			return 0, fmt.Errorf("line in unrecognized format: '%s'", line)
 		}
 		n, err := strconv.Atoi(val)
 		if err != nil {
-			return 0, nil, err
+			return 0, err
 		}
 		// account for '\n'
 		n++
@@ -253,12 +283,13 @@ func ReadRecord(r *bufio.Reader, record *Record) (int, []string, error) {
 		n, err = io.ReadFull(r, d)
 		nBytesRead += n
 		if err != nil {
-			return 0, nil, err
+			return 0, err
 		}
 		if n != len(d) {
-			return 0, nil, fmt.Errorf("wanted to read %d but read %d bytes", len(d), n)
+			return 0, fmt.Errorf("wanted to read %d but read %d bytes", len(d), n)
 		}
 		val = string(d[:n-1])
-		data = append(data, key, val)
+		rec.Keys = append(rec.Keys, key)
+		rec.Values = append(rec.Values, val)
 	}
 }

@@ -71,13 +71,14 @@ func bufReaderFromBytes(d []byte) *bufio.Reader {
 	return bufio.NewReader(r)
 }
 
-func testRoundTrip(t *testing.T, r *Record) string {
-	d := r.Marshal()
+func testRoundTrip(t *testing.T, recIn *Record) string {
+	d := recIn.Marshal()
 	br := bufReaderFromBytes(d)
 	rec := Record{}
-	_, data, err := ReadRecord(br, &rec)
+	_, err := ReadRecord(br, &rec)
 	assert.Nil(t, err)
-	assert.Equal(t, r.data, data)
+	assert.Equal(t, rec.Keys, recIn.Keys)
+	assert.Equal(t, rec.Values, recIn.Values)
 	return string(d)
 }
 
@@ -108,7 +109,8 @@ func TestMany(t *testing.T) {
 	rec := &Record{}
 	var positions []int64
 	var currPos int64
-	for i := 0; i < 200; i++ {
+	nRecs := 8
+	for i := 0; i < nRecs; i++ {
 		rec.Reset()
 		nRand := rand.Intn(1024)
 		rec.Append("counter", strconv.Itoa(i), "random", strconv.Itoa(nRand))
@@ -127,6 +129,7 @@ func TestMany(t *testing.T) {
 	}
 
 	r := bytes.NewBuffer(w.Bytes())
+	//fmt.Printf("!!%s!!\n", string(w.Bytes()))
 	reader := NewReader(r)
 	i := 0
 	var recPos int64
@@ -141,6 +144,15 @@ func TestMany(t *testing.T) {
 		assert.True(t, ok)
 		i++
 	}
+}
+
+func TestAppendPanics(t *testing.T) {
+	// TODO: add a test that Record.Append("one") panics
+}
+
+func dumpRec(rec *Record) {
+	d := rec.Marshal()
+	fmt.Printf("%s", string(d))
 }
 
 /*
@@ -214,7 +226,7 @@ func BenchmarkSiserUnmarshal(b *testing.B) {
 	var err error
 	for n := 0; n < b.N; n++ {
 		r := bufio.NewReader(bytes.NewBuffer(serializedSiser))
-		_, lines, err = ReadRecord(r, &rec)
+		_, err = ReadRecord(r, &rec)
 		panicIfErr(err)
 	}
 }
