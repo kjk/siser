@@ -54,7 +54,7 @@ fatalIfErr(err)
 defer f.Close()
 r := siser.NewReader(f)
 for r.ReadNext() {
-	record := r.Record()
+	_, record := r.Record()
 	code, ok := r.Get("code")
 	// get rest of values and do something with them
 }
