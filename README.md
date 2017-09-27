@@ -15,7 +15,7 @@ file with json records).
 This library is meant to be a middle ground:
 * you can serialize arbitrary records with multiple key/value pairs
 * the output is human-readable
-* it's desgined to be efficient and simple to use
+* it's designed to be efficient and simple to use
 
 ## API usage
 
@@ -69,7 +69,7 @@ I use `siser` for in my web services for 2 use cases:
 * implementing poor-man's analytics
 
 Logging for debugging adds a little bit more structure over
-adhoc logging. I can add some meta-data to log entries
+ad hoc logging. I can add some meta-data to log entries
 and in addition to reading the logs I can quickly write
 programs that filter the logs. For example if I add serving time
 to http request log I could easily write a program that shows
