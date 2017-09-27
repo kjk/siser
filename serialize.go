@@ -90,6 +90,7 @@ func isASCII(s string) bool {
 
 // intStrLen calculates how long n would be when converted to a string
 // i.e. equivalent of len(strconv.Itoa(n)) but faster
+// Note: not used
 func intStrLen(n int) int {
 	l := 1 // count the last digit here
 	if n < 0 {

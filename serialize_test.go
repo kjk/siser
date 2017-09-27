@@ -151,6 +151,35 @@ func TestAppendPanics(t *testing.T) {
 	assert.Panics(t, func() { rec.Append("foo") }, "should panic with even number of arguments")
 }
 
+func TestIntStrLen(t *testing.T) {
+	tests := []struct {
+		n   int
+		exp int
+	}{
+		{-1, 2},
+		{-89, 3},
+		{-319, 4},
+		{-2341, 5},
+		{0, 1},
+		{9, 1},
+		{10, 2},
+		{34, 2},
+		{99, 2},
+		{100, 3},
+		{823, 3},
+		{999, 3},
+		{1000, 4},
+		{3241, 4},
+		{9999, 4},
+		{10000, 5},
+		{99999, 5},
+	}
+	for _, test := range tests {
+		got := intStrLen(test.n)
+		assert.Equal(t, test.exp, got)
+	}
+}
+
 func dumpRec(rec *Record) {
 	d := rec.Marshal()
 	fmt.Printf("%s", string(d))
