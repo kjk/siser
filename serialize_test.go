@@ -147,7 +147,8 @@ func TestMany(t *testing.T) {
 }
 
 func TestAppendPanics(t *testing.T) {
-	// TODO: add a test that Record.Append("one") panics
+	rec := &Record{}
+	assert.Panics(t, func() { rec.Append("foo") }, "should panic with even number of arguments")
 }
 
 func dumpRec(rec *Record) {
