@@ -2,5 +2,5 @@
 
 set -e
 
-export GOPATH=
+export GOPATH=/tmp
 go test
