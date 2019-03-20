@@ -83,8 +83,8 @@ func testRoundTrip(t *testing.T, recIn *Record) string {
 }
 
 func TestWriter(t *testing.T) {
-	var buf bytes.Buffer
-	w := NewWriter(&buf)
+	buf := &bytes.Buffer{}
+	w := NewWriter(buf)
 	_, err := w.Write([]byte("hey\n"))
 	assert.NoError(t, err)
 	_, err = w.WriteNamed([]byte("ho"), "with name")
@@ -96,6 +96,18 @@ hey
 ho
 `
 	assert.Equal(t, exp, s)
+	buf = bytes.NewBufferString(exp)
+	r := NewReader(buf)
+	r.WriteStyle = WriteStyleSizePrefix
+	n := 0
+	strings := []string{"hey\n", "ho"}
+	names := []string{"", "with name"}
+	for r.ReadNextData() {
+		assert.Equal(t, strings[n], string(r.Data))
+		assert.Equal(t, names[n], string(r.Name))
+		n++
+	}
+	assert.NoError(t, r.Err())
 }
 
 func TestRecordSerializeSimple(t *testing.T) {
