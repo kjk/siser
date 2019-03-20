@@ -81,7 +81,7 @@ func testRoundTrip(t *testing.T, recIn *Record) string {
 	assert.Equal(t, rec.Values, recIn.Values)
 	return string(d)
 }
-
+asf
 func TestWriter(t *testing.T) {
 	strings := []string{"hey\n", "ho"}
 	names := []string{"", "with name"}
