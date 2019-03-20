@@ -32,6 +32,10 @@ type Record struct {
 	Keys []string
 	// Values contains value for corresponding key in Keys
 	Values []string
+
+	// this exists for backwards compatibility
+	// by default false so we'll add separator
+	noSeparator bool
 }
 
 // Append adds key/value pairs to a record
@@ -135,7 +139,10 @@ func (r *Record) Marshal() []byte {
 		}
 		n += len(val) + 1 // +1 for '\n'
 	}
-	n += len(recordSeparatorWithNL) // +1 for '\n'
+	addSeparator := !r.noSeparator
+	if addSeparator {
+		n += len(recordSeparatorWithNL) // +1 for '\n'
+	}
 	buf := make([]byte, n, n)
 
 	pos := 0
@@ -164,8 +171,10 @@ func (r *Record) Marshal() []byte {
 		buf[pos] = '\n'
 		pos++
 	}
-	copy(buf[pos:], recordSeparatorWithNL)
-	pos += len(recordSeparatorWithNL)
+	if addSeparator {
+		copy(buf[pos:], recordSeparatorWithNL)
+		pos += len(recordSeparatorWithNL)
+	}
 	panicIf(pos != n)
 	return buf
 }
@@ -182,6 +191,57 @@ type Reader struct {
 	// this is needed for cases where we want to seek to a given record
 	currRecPos int64
 	nextRecPos int64
+}
+
+type WriteStyle int
+
+const (
+	// uses "---\n" at end of record for separating records
+	WriteStyleSeparator WriteStyle = iota
+	// uses "135 name\n" header before each record where
+	// "135" is size and "name" is optional name of the record
+	WriteStyleSizePrefix
+)
+
+type Writer struct {
+	WriteStyle WriteStyle
+	w          io.Writer
+}
+
+func NewWriter(w io.Writer) *Writer {
+	return &Writer{
+		w:          w,
+		WriteStyle: WriteStyleSizePrefix,
+	}
+}
+
+func (w *Writer) WriteRecord(r *Record) (int, error) {
+	return w.WriteRecordNamed(r, "")
+}
+
+func (w *Writer) WriteRecordNamed(r *Record, name string) (int, error) {
+	r.noSeparator = (w.WriteStyle == WriteStyleSizePrefix)
+	d := r.Marshal()
+	if r.noSeparator {
+		return w.WriteNamed(d, name)
+	}
+	// if we have separator, name is ignored
+	return w.w.Write(d)
+}
+
+func (w *Writer) Write(d []byte) (int, error) {
+	return w.WriteNamed(d, "")
+}
+
+func (w *Writer) WriteNamed(d []byte, name string) (int, error) {
+	var header string
+	if name == "" {
+		header = strconv.Itoa(len(d)) + "\n"
+	} else {
+		header = strconv.Itoa(len(d)) + " " + name + "\n"
+	}
+	d2 := append([]byte(header), d...)
+	return w.w.Write(d2)
 }
 
 // NewReader creates a new reader
