@@ -2,6 +2,7 @@ package siser
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"strconv"
@@ -32,6 +33,7 @@ type Record struct {
 	Keys []string
 	// Values contains value for corresponding key in Keys
 	Values []string
+	Name   string
 
 	// this exists for backwards compatibility
 	// by default false so we'll add separator
@@ -179,20 +181,6 @@ func (r *Record) Marshal() []byte {
 	return buf
 }
 
-// Reader is for reading (deserializing) records
-// from io.Reader
-type Reader struct {
-	r   io.Reader
-	br  *bufio.Reader
-	rec Record
-	err error
-	// position of the current record within the reader. It will match
-	// position within the reader if we start reading from the beginning
-	// this is needed for cases where we want to seek to a given record
-	currRecPos int64
-	nextRecPos int64
-}
-
 type WriteStyle int
 
 const (
@@ -216,14 +204,10 @@ func NewWriter(w io.Writer) *Writer {
 }
 
 func (w *Writer) WriteRecord(r *Record) (int, error) {
-	return w.WriteRecordNamed(r, "")
-}
-
-func (w *Writer) WriteRecordNamed(r *Record, name string) (int, error) {
 	r.noSeparator = (w.WriteStyle == WriteStyleSizePrefix)
 	d := r.Marshal()
-	if r.noSeparator {
-		return w.WriteNamed(d, name)
+	if w.WriteStyle == WriteStyleSizePrefix {
+		return w.WriteNamed(d, r.Name)
 	}
 	// if we have separator, name is ignored
 	return w.w.Write(d)
@@ -248,11 +232,36 @@ func (w *Writer) WriteNamed(d []byte, name string) (int, error) {
 	return w.w.Write(d2)
 }
 
+// Reader is for reading (deserializing) records
+// from io.Reader
+type Reader struct {
+	WriteStyle WriteStyle
+
+	r  io.Reader
+	br *bufio.Reader
+
+	// rec is used when calling ReadNext()
+	rec Record
+
+	// Data / Name is used when calling ReadNextData()
+	Data []byte
+	Name string
+
+	err error
+	// position of the current record within the reader. It will match
+	// position within the reader if we start reading from the beginning
+	// this is needed for cases where we want to seek to a given record
+	currRecPos int64
+	nextRecPos int64
+}
+
 // NewReader creates a new reader
 func NewReader(r io.Reader) *Reader {
 	return &Reader{
-		r:  r,
-		br: bufio.NewReader(r),
+		// for backwards compatibility
+		WriteStyle: WriteStyleSeparator,
+		r:          r,
+		br:         bufio.NewReader(r),
 	}
 }
 
@@ -262,6 +271,7 @@ func (r *Reader) ReadNext() bool {
 	if r.err != nil {
 		return false
 	}
+	r.rec.noSeparator = (r.WriteStyle == WriteStyleSizePrefix)
 	var n int
 	r.currRecPos = r.nextRecPos
 	n, r.err = ReadRecord(r.br, &r.rec)
@@ -270,6 +280,17 @@ func (r *Reader) ReadNext() bool {
 		return false
 	}
 	return true
+}
+
+func (r *Reader) ReadNextData() bool {
+	if r.err != nil {
+		return false
+	}
+	var n int
+	r.currRecPos = r.nextRecPos
+	r.Data, n, r.Name, r.err = ReadSizePrefixed(r.br)
+	r.nextRecPos += int64(n)
+	return r.err != nil
 }
 
 // Record returns information from last ReadNext. Returns offset of the record
@@ -287,16 +308,63 @@ func (r *Reader) Err() error {
 	return r.err
 }
 
+func ReadSizePrefixed(r *bufio.Reader) ([]byte, int, string, error) {
+	line, err := r.ReadString('\n')
+	if err != nil {
+		return nil, 0, "", err
+	}
+	n := len(line)
+	// account for the fact that for readability we might
+	// have padded a record with '\n' so here we might
+	// get an empty line
+	if len(line) == 1 {
+		line, err = r.ReadString('\n')
+		if err != nil {
+			return nil, 0, "", err
+		}
+		n += len(line)
+	}
+	line = line[:len(line)-1]
+	var name string
+	parts := strings.SplitN(line, " ", 2)
+	size := parts[0]
+	if len(parts) > 1 {
+		name = parts[1]
+	}
+	n, err = strconv.Atoi(size)
+	if err != nil {
+		return nil, 0, "", err
+	}
+	d := make([]byte, n, n)
+	_, err = r.Read(d[:])
+	if err != nil {
+		return nil, 0, "", err
+	}
+	return d, len(d) + 1, name, nil
+}
+
 // ReadRecord reads another record from io.Reader
 // If error is io.EOF, there are no more records in the reader
 // We need bufio.Reader here for efficient reading of lines
 // with occasional reads of raw bytes.
 // Record is passed in so that it can be re-used
-func ReadRecord(r *bufio.Reader, rec *Record) (int, error) {
+func ReadRecord(br *bufio.Reader, rec *Record) (int, error) {
 	var line string
 	nBytesRead := 0
+	nBytesRead2 := 0
 	rec.Reset()
 	var err error
+	r := br
+	if rec.noSeparator {
+		d, n, name, err := ReadSizePrefixed(br)
+		if err != nil {
+			return 0, err
+		}
+		nBytesRead2 = n
+		rec.Name = name
+		buf := bytes.NewBuffer(d)
+		r = bufio.NewReader(buf)
+	}
 	for {
 		line, err = r.ReadString('\n')
 		if err == io.EOF {
@@ -314,6 +382,9 @@ func ReadRecord(r *bufio.Reader, rec *Record) (int, error) {
 			return 0, fmt.Errorf("line in unrecognized format: '%s'", line)
 		}
 		if line == recordSeparatorWithNL {
+			if rec.noSeparator {
+				return nBytesRead2, nil
+			}
 			return nBytesRead, nil
 		}
 		// strip '\n' from the end
