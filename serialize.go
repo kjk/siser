@@ -241,6 +241,10 @@ func (w *Writer) WriteNamed(d []byte, name string) (int, error) {
 		header = strconv.Itoa(len(d)) + " " + name + "\n"
 	}
 	d2 := append([]byte(header), d...)
+	n := len(d2)
+	if d2[n-1] != '\n' {
+		d2 = append(d2, '\n')
+	}
 	return w.w.Write(d2)
 }
 

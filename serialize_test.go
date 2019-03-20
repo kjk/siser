@@ -82,6 +82,22 @@ func testRoundTrip(t *testing.T, recIn *Record) string {
 	return string(d)
 }
 
+func TestWriter(t *testing.T) {
+	var buf bytes.Buffer
+	w := NewWriter(&buf)
+	_, err := w.Write([]byte("hey\n"))
+	assert.NoError(t, err)
+	_, err = w.WriteNamed([]byte("ho"), "with name")
+	assert.NoError(t, err)
+	s := buf.String()
+	exp := `4
+hey
+2 with name
+ho
+`
+	assert.Equal(t, exp, s)
+}
+
 func TestRecordSerializeSimple(t *testing.T) {
 	var r Record
 	r.Append("key", "val")
