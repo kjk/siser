@@ -83,31 +83,39 @@ func testRoundTrip(t *testing.T, recIn *Record) string {
 }
 
 func TestWriter(t *testing.T) {
-	buf := &bytes.Buffer{}
-	w := NewWriter(buf)
-	_, err := w.Write([]byte("hey\n"))
-	assert.NoError(t, err)
-	_, err = w.WriteNamed([]byte("ho"), "with name")
-	assert.NoError(t, err)
-	s := buf.String()
-	exp := `4
+	strings := []string{"hey\n", "ho"}
+	names := []string{"", "with name"}
+	expPrefix := `4
 hey
 2 with name
 ho
 `
-	assert.Equal(t, exp, s)
-	buf = bytes.NewBufferString(exp)
+	var err error
+	buf := &bytes.Buffer{}
+	w := NewWriter(buf)
+	for i, s := range strings {
+		name := names[i]
+		if name == "" {
+			_, err = w.Write([]byte(s))
+		} else {
+			_, err = w.WriteNamed([]byte(s), name)
+		}
+		assert.NoError(t, err)
+	}
+	s := buf.String()
+	assert.Equal(t, expPrefix, s)
+	buf = bytes.NewBufferString(expPrefix)
+
 	r := NewReader(buf)
-	r.WriteStyle = WriteStyleSizePrefix
+	r.Format = FormatSizePrefix
 	n := 0
-	strings := []string{"hey\n", "ho"}
-	names := []string{"", "with name"}
 	for r.ReadNextData() {
 		assert.Equal(t, strings[n], string(r.Data))
 		assert.Equal(t, names[n], string(r.Name))
 		n++
 	}
 	assert.NoError(t, r.Err())
+
 }
 
 func TestRecordSerializeSimple(t *testing.T) {
