@@ -181,42 +181,49 @@ func (r *Record) Marshal() []byte {
 	return buf
 }
 
-type WriteStyle int
+// Format describes the format of written records
+type Format int
 
 const (
-	// uses "---\n" at end of record for separating records
-	WriteStyleSeparator WriteStyle = iota
-	// uses "135 name\n" header before each record where
-	// "135" is size and "name" is optional name of the record
-	WriteStyleSizePrefix
+	// FormatSeparator uses "---\n" at end of record for
+	// separating records. Only applies when writing records
+	FormatSeparator Format = iota
+	// FormatSizePrefix uses "135 name\n" header before each record
+	// where "135" is size and "name" is optional name of the record
+	FormatSizePrefix
 )
 
+// Writer writes records to in a structured format
 type Writer struct {
-	WriteStyle WriteStyle
-	w          io.Writer
+	Format Format
+	w      io.Writer
 }
 
+// NewWriter creates a writer
 func NewWriter(w io.Writer) *Writer {
 	return &Writer{
-		w:          w,
-		WriteStyle: WriteStyleSizePrefix,
+		w:      w,
+		Format: FormatSizePrefix,
 	}
 }
 
+// WriteRecord writes a record in a specified format
 func (w *Writer) WriteRecord(r *Record) (int, error) {
-	r.noSeparator = (w.WriteStyle == WriteStyleSizePrefix)
+	r.noSeparator = (w.Format == FormatSizePrefix)
 	d := r.Marshal()
-	if w.WriteStyle == WriteStyleSizePrefix {
+	if w.Format == FormatSizePrefix {
 		return w.WriteNamed(d, r.Name)
 	}
 	// if we have separator, name is ignored
 	return w.w.Write(d)
 }
 
+// Write writes a block
 func (w *Writer) Write(d []byte) (int, error) {
 	return w.WriteNamed(d, "")
 }
 
+// WriteNamed writes a block with a name
 func (w *Writer) WriteNamed(d []byte, name string) (int, error) {
 	var header string
 	if name == "" {
@@ -235,7 +242,7 @@ func (w *Writer) WriteNamed(d []byte, name string) (int, error) {
 // Reader is for reading (deserializing) records
 // from io.Reader
 type Reader struct {
-	WriteStyle WriteStyle
+	Format Format
 
 	r  io.Reader
 	br *bufio.Reader
@@ -259,9 +266,9 @@ type Reader struct {
 func NewReader(r io.Reader) *Reader {
 	return &Reader{
 		// for backwards compatibility
-		WriteStyle: WriteStyleSeparator,
-		r:          r,
-		br:         bufio.NewReader(r),
+		Format: FormatSeparator,
+		r:      r,
+		br:     bufio.NewReader(r),
 	}
 }
 
@@ -271,7 +278,7 @@ func (r *Reader) ReadNext() bool {
 	if r.err != nil {
 		return false
 	}
-	r.rec.noSeparator = (r.WriteStyle == WriteStyleSizePrefix)
+	r.rec.noSeparator = (r.Format == FormatSizePrefix)
 	var n int
 	r.currRecPos = r.nextRecPos
 	n, r.err = ReadRecord(r.br, &r.rec)
@@ -282,6 +289,9 @@ func (r *Reader) ReadNext() bool {
 	return true
 }
 
+// ReadNextData reads a block of data. Returns false if finished
+// reading. Check Err() to see if there was an error reading.
+// After reading r.Data and r.Name contains data and (optional) name.
 func (r *Reader) ReadNextData() bool {
 	if r.err != nil {
 		return false
@@ -308,6 +318,9 @@ func (r *Reader) Err() error {
 	return r.err
 }
 
+// ReadSizePrefixed reads data in FormatSizePrefixed.
+// Returns data, total number of bytes read (which is bigger than
+// the size of data), optional name and error.
 func ReadSizePrefixed(r *bufio.Reader) ([]byte, int, string, error) {
 	line, err := r.ReadString('\n')
 	if err != nil {
