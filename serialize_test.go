@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"os"
 	"strconv"
 	"testing"
 	"time"
@@ -153,9 +154,16 @@ func TestManySizePrefixedNamed(t *testing.T) {
 }
 
 func testMany(t *testing.T, format Format, name string) {
-	buf := &bytes.Buffer{}
+	path := "test.txt"
+	os.Remove(path)
+	f, err := os.Create(path)
+	assert.NoError(t, err)
+	if err != nil {
+		return
+	}
+	defer os.Remove(path)
 
-	w := NewWriter(buf)
+	w := NewWriter(f)
 	w.Format = format
 
 	rec := &Record{}
@@ -181,9 +189,14 @@ func testMany(t *testing.T, format Format, name string) {
 		currPos += int64(n)
 	}
 
-	r := bytes.NewBuffer(buf.Bytes())
-	//fmt.Printf("!!%s!!\n", string(buf.Bytes()))
-	reader := NewReader(r)
+	err = f.Close()
+	assert.NoError(t, err)
+
+	f, err = os.Open(path)
+	assert.NoError(t, err)
+	defer f.Close()
+
+	reader := NewReader(f)
 	i := 0
 	var recPos int64
 	for reader.ReadNext() {
