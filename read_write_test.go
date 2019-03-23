@@ -209,7 +209,7 @@ func testMany(t *testing.T, format Format, name string) {
 	i := 0
 	for reader.ReadNext() {
 		recPos, rec := reader.Record()
-		assert.True(t, true || positions[i] == recPos)
+		assert.Equal(t, positions[i], recPos)
 		counter, ok := rec.Get("counter")
 		assert.True(t, ok)
 		exp := strconv.Itoa(i)

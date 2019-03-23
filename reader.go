@@ -96,7 +96,7 @@ func ReadSizePrefixed(r *bufio.Reader) ([]byte, int, string, error) {
 	if err != nil {
 		return nil, 0, "", err
 	}
-	n := len(line)
+	nBytesRead := len(line)
 	// account for the fact that for readability we might
 	// have padded a record with '\n' so here we might
 	// get an empty line
@@ -105,8 +105,9 @@ func ReadSizePrefixed(r *bufio.Reader) ([]byte, int, string, error) {
 		if err != nil {
 			return nil, 0, "", err
 		}
-		n += len(line)
+		nBytesRead += len(line)
 	}
+	// remove \n from the end
 	line = line[:len(line)-1]
 	var name string
 	parts := strings.SplitN(line, " ", 2)
@@ -114,16 +115,17 @@ func ReadSizePrefixed(r *bufio.Reader) ([]byte, int, string, error) {
 	if len(parts) > 1 {
 		name = parts[1]
 	}
-	n, err = strconv.Atoi(size)
+	n, err := strconv.Atoi(size)
 	if err != nil {
 		return nil, 0, "", err
 	}
-	d := make([]byte, n, n)
+	nBytesRead += n
+	d := make([]byte, n)
 	_, err = r.Read(d[:])
 	if err != nil {
 		return nil, 0, "", err
 	}
-	return d, len(d) + 1, name, nil
+	return d, nBytesRead, name, nil
 }
 
 // ReadRecord reads another record from io.Reader
