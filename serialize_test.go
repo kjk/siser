@@ -140,14 +140,31 @@ func TestRecordSerializeSimple3(t *testing.T) {
 	assert.Equal(t, exp, got)
 }
 
-func TestMany(t *testing.T) {
-	w := &bytes.Buffer{}
+func TestManySeparator(t *testing.T) {
+	testMany(t, FormatSeparator, "")
+}
+
+func TestManySizePrefixed(t *testing.T) {
+	testMany(t, FormatSizePrefix, "")
+}
+
+func TestManySizePrefixedNamed(t *testing.T) {
+	testMany(t, FormatSizePrefix, "named")
+}
+
+func testMany(t *testing.T, format Format, name string) {
+	buf := &bytes.Buffer{}
+
+	w := NewWriter(buf)
+	w.Format = format
+
 	rec := &Record{}
 	var positions []int64
 	var currPos int64
 	nRecs := 8
 	for i := 0; i < nRecs; i++ {
 		rec.Reset()
+		rec.Name = name
 		nRand := rand.Intn(1024)
 		rec.Append("counter", strconv.Itoa(i), "random", strconv.Itoa(nRand))
 		if i%12 == 0 {
@@ -158,14 +175,14 @@ func TestMany(t *testing.T) {
 				rec.Append("after", "whatever")
 			}
 		}
-		n, err := w.Write(rec.Marshal())
+		n, err := w.WriteRecord(rec)
 		assert.Nil(t, err)
 		positions = append(positions, currPos)
 		currPos += int64(n)
 	}
 
-	r := bytes.NewBuffer(w.Bytes())
-	//fmt.Printf("!!%s!!\n", string(w.Bytes()))
+	r := bytes.NewBuffer(buf.Bytes())
+	//fmt.Printf("!!%s!!\n", string(buf.Bytes()))
 	reader := NewReader(r)
 	i := 0
 	var recPos int64
@@ -178,6 +195,7 @@ func TestMany(t *testing.T) {
 		assert.Equal(t, exp, counter)
 		_, ok = rec.Get("random")
 		assert.True(t, ok)
+		assert.Equal(t, rec.Name, name)
 		i++
 	}
 }

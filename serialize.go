@@ -69,6 +69,7 @@ func resetStringArray(a []string) []string {
 func (r *Record) Reset() {
 	r.Keys = resetStringArray(r.Keys)
 	r.Values = resetStringArray(r.Values)
+	r.Name = ""
 }
 
 // Get returns a value for a given key
@@ -378,11 +379,12 @@ func ReadRecord(br *bufio.Reader, rec *Record) (int, error) {
 		buf := bytes.NewBuffer(d)
 		r = bufio.NewReader(buf)
 	}
+
 	for {
 		line, err = r.ReadString('\n')
 		if err == io.EOF {
 			if len(rec.Keys) > 0 {
-				return 0, fmt.Errorf("half-read record %v", rec.Keys)
+				return 0, fmt.Errorf("half-read record. keys: %#v, values: %#v", rec.Keys, rec.Values)
 			}
 			return 0, io.EOF
 		}
