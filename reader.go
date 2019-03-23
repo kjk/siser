@@ -121,7 +121,7 @@ func ReadSizePrefixed(r *bufio.Reader) ([]byte, int, string, error) {
 	}
 	nBytesRead += n
 	d := make([]byte, n)
-	_, err = r.Read(d[:])
+	_, err = io.ReadFull(r, d[:])
 	if err != nil {
 		return nil, 0, "", err
 	}
