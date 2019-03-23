@@ -77,13 +77,21 @@ func testRoundTrip(t *testing.T, recIn *Record) string {
 	br := bufReaderFromBytes(d)
 	rec := Record{}
 	_, err := ReadRecord(br, &rec)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, rec.Keys, recIn.Keys)
 	assert.Equal(t, rec.Values, recIn.Values)
 	return string(d)
 }
 
-func TestWriter(t *testing.T) {
+func TestWriterSizePrefixed(t *testing.T) {
+	testWriter(t, FormatSizePrefix)
+}
+
+func TestWriterSeparator(t *testing.T) {
+	testWriter(t, FormatSeparator)
+}
+
+func testWriter(t *testing.T, format Format) {
 	strings := []string{"hey\n", "ho"}
 	names := []string{"", "with name"}
 	expPrefix := `4
@@ -94,6 +102,7 @@ ho
 	var err error
 	buf := &bytes.Buffer{}
 	w := NewWriter(buf)
+	w.Format = format
 	for i, s := range strings {
 		name := names[i]
 		if name == "" {
@@ -108,7 +117,7 @@ ho
 	buf = bytes.NewBufferString(expPrefix)
 
 	r := NewReader(buf)
-	r.Format = FormatSizePrefix
+	r.Format = format
 	n := 0
 	for r.ReadNextData() {
 		assert.Equal(t, strings[n], string(r.Data))
@@ -116,7 +125,6 @@ ho
 		n++
 	}
 	assert.NoError(t, r.Err())
-
 }
 
 func TestRecordSerializeSimple(t *testing.T) {
@@ -197,6 +205,7 @@ func testMany(t *testing.T, format Format, name string) {
 	defer f.Close()
 
 	reader := NewReader(f)
+	reader.Format = format
 	i := 0
 	var recPos int64
 	for reader.ReadNext() {
@@ -211,6 +220,7 @@ func testMany(t *testing.T, format Format, name string) {
 		assert.Equal(t, rec.Name, name)
 		i++
 	}
+	assert.NoError(t, reader.Err())
 }
 
 func TestAppendPanics(t *testing.T) {

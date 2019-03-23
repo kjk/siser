@@ -364,11 +364,10 @@ func ReadSizePrefixed(r *bufio.Reader) ([]byte, int, string, error) {
 // Record is passed in so that it can be re-used
 func ReadRecord(br *bufio.Reader, rec *Record) (int, error) {
 	var line string
-	nBytesRead := 0
-	nBytesRead2 := 0
 	rec.Reset()
 	var err error
 	r := br
+	var nBytesRead2 int
 	if rec.noSeparator {
 		d, n, name, err := ReadSizePrefixed(br)
 		if err != nil {
@@ -380,13 +379,14 @@ func ReadRecord(br *bufio.Reader, rec *Record) (int, error) {
 		r = bufio.NewReader(buf)
 	}
 
+	var nBytesRead int
 	for {
 		line, err = r.ReadString('\n')
 		if err == io.EOF {
-			if len(rec.Keys) > 0 {
+			if len(rec.Keys) != len(rec.Values) {
 				return 0, fmt.Errorf("half-read record. keys: %#v, values: %#v", rec.Keys, rec.Values)
 			}
-			return 0, io.EOF
+			return nBytesRead2, io.EOF
 		}
 		if err != nil {
 			return 0, err
@@ -396,11 +396,10 @@ func ReadRecord(br *bufio.Reader, rec *Record) (int, error) {
 		if n < 3 || line[n-1] != '\n' {
 			return 0, fmt.Errorf("line in unrecognized format: '%s'", line)
 		}
-		if line == recordSeparatorWithNL {
-			if rec.noSeparator {
-				return nBytesRead2, nil
+		if !rec.noSeparator {
+			if line == recordSeparatorWithNL {
+				return nBytesRead, nil
 			}
-			return nBytesRead, nil
 		}
 		// strip '\n' from the end
 		line = line[:n-1]
