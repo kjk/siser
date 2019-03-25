@@ -68,10 +68,6 @@ func (r *Record) Get(key string) (string, bool) {
 	return "", false
 }
 
-func endsWithNewline(s string) bool {
-	return len(s) > 0 && s[len(s)-1] == '\n'
-}
-
 func nonEmptyEndsWithNewline(s string) bool {
 	return len(s) == 0 || s[len(s)-1] == '\n'
 }

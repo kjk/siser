@@ -47,20 +47,11 @@ func intStrLen(n int) int {
 		n = -n
 		l = 2
 	}
-	if n <= 9 {
-		return l
-	}
-	if n <= 99 {
-		return l + 1
-	}
-	if n <= 999 {
-		return l + 2
-	}
-	for n > 999 {
+	for n > 9 {
 		l++
 		n = n / 10
 	}
-	return l + 2
+	return l
 }
 
 func isASCII(s string) bool {

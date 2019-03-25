@@ -39,12 +39,69 @@ func bufReaderFromBytes(d []byte) *bufio.Reader {
 	return bufio.NewReader(bytes.NewBuffer(d))
 }
 
-func testRoundTrip(t *testing.T, recIn *Record) string {
-	d := recIn.Marshal()
+func timeDiff(t1 time.Time, t2 time.Time) time.Duration {
+	dur := t1.Sub(t2)
+	if dur < 0 {
+		dur = -dur
+	}
+	return dur
+}
+
+func timeDiffLessThanMs(t1 time.Time, t2 time.Time) bool {
+	return timeDiff(t1, t2) < time.Millisecond
+}
+
+func testRoundTrip(t *testing.T, r *Record) string {
+	d := r.Marshal()
 	rec, err := UnmarshalRecord(d, nil)
 	assert.NoError(t, err)
-	assert.Equal(t, rec.Entries, recIn.Entries)
+	rec2 := &Record{}
+	err = rec2.Unmarshal(d)
+	assert.NoError(t, err)
+
+	// name and timestamp are not serialized here
+	assert.Equal(t, rec.Entries, r.Entries)
+	assert.Equal(t, rec2.Entries, r.Entries)
+
+	testWriterRoundTrip(t, r)
+
 	return string(d)
+}
+
+func TestUnmarshalErrors(t *testing.T) {
+	invalidRecords := []string{
+		"ha",
+		"ha\n",
+		"ha:\n",
+		"ha:_\n",
+		"ha:+32\nma",
+		"ha:+2\nmara",
+		"ha:+los\nma",
+	}
+	// test error paths in UnmarshalRecord
+	for _, s := range invalidRecords {
+		_, err := UnmarshalRecord([]byte(s), nil)
+		assert.Error(t, err, "s: '%s'", s)
+	}
+}
+
+func testWriterRoundTrip(t *testing.T, r *Record) {
+	var buf bytes.Buffer
+	w := NewWriter(&buf)
+	n, err := w.WriteRecord(r)
+	assert.NoError(t, err)
+	d := buf.Bytes()
+	assert.Equal(t, len(d), n)
+
+	buf2 := bytes.NewBuffer(d)
+	reader := NewReader(bufio.NewReader(buf2))
+	ok := reader.ReadNextRecord()
+	assert.True(t, ok)
+	rec := reader.Record
+	assert.Equal(t, rec.Entries, r.Entries)
+	assert.Equal(t, rec.Name, r.Name)
+
+	assert.True(t, r.Timestamp.IsZero() || timeDiffLessThanMs(rec.Timestamp, r.Timestamp), "rec.Timestamp: %s, r.Timestamp: %s, diff: %s", rec.Timestamp, r.Timestamp, timeDiff(rec.Timestamp, r.Timestamp))
 }
 
 func TestWriter(t *testing.T) {
@@ -82,7 +139,26 @@ ho
 
 func TestRecordSerializeSimple(t *testing.T) {
 	var r Record
+
+	{
+		d := r.Marshal()
+		assert.Equal(t, 0, len(d))
+	}
+
 	r.Append("key", "val")
+
+	{
+		v, ok := r.Get("key")
+		assert.True(t, ok)
+		assert.Equal(t, v, "val")
+	}
+
+	{
+		v, ok := r.Get("Key")
+		assert.False(t, ok)
+		assert.Equal(t, v, "")
+	}
+
 	s := testRoundTrip(t, &r)
 	assert.Equal(t, "key: val\n", s)
 }
@@ -112,7 +188,7 @@ func testMany(t *testing.T, name string) {
 	w := NewWriter(&buf)
 
 	// we can't compare timestamp directly but as truncated to milliseconds
-	now := TimeFromUnixMillisecond(TimeToUnixMillisecond(time.Now()))
+	now := time.Now()
 
 	rec := &Record{}
 	var positions []int64
@@ -152,7 +228,7 @@ func testMany(t *testing.T, name string) {
 		_, ok = rec.Get("random")
 		assert.True(t, ok)
 		assert.Equal(t, rec.Name, name)
-		assert.True(t, rec.Timestamp.Equal(now), "timestamp: %s, now: %s", rec.Timestamp, now)
+		assert.True(t, timeDiffLessThanMs(rec.Timestamp, now), "timestamp: %s, now: %s", rec.Timestamp, now)
 		i++
 	}
 	assert.NoError(t, reader.Err())
