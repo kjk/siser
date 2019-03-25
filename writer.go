@@ -31,7 +31,7 @@ func (w *Writer) Write(d []byte, t time.Time, name string) (int, error) {
 	if t.IsZero() {
 		t = time.Now()
 	}
-	ms := t.UnixNano() / 1e6
+	ms := TimeToUnixMillisecond(t)
 	hdr := strconv.Itoa(len(d)) + " " + strconv.FormatInt(ms, 10)
 	if name != "" {
 		hdr += " " + name

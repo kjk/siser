@@ -1,6 +1,9 @@
 package siser
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 func fmtArgs(args ...interface{}) string {
 	if len(args) == 0 {
@@ -69,4 +72,17 @@ func isASCII(s string) bool {
 		}
 	}
 	return true
+}
+
+// TimeToUnixMillisecond converts t into Unix epoch time in milliseconds.
+// That's because seconds is not enough precision and nanoseconds is too much.
+func TimeToUnixMillisecond(t time.Time) int64 {
+	n := t.UnixNano()
+	return n / 1e6
+}
+
+// TimeFromUnixMillisecond returns time from Unix epoch time in milliseconds.
+func TimeFromUnixMillisecond(unixMs int64) time.Time {
+	nano := unixMs * 1e6
+	return time.Unix(0, nano)
 }

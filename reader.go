@@ -100,7 +100,7 @@ func (r *Reader) ReadNextData() bool {
 		r.err = fmt.Errorf("Unxpected header '%s'", string(hdr))
 		return false
 	}
-	r.Timestamp = time.Unix(0, timeMs*10e6)
+	r.Timestamp = TimeFromUnixMillisecond(timeMs)
 	r.Name = string(name)
 
 	// we try to re-use r.Data as long as it doesn't grow too much
@@ -146,8 +146,8 @@ func (r *Reader) ReadNextData() bool {
 // no more record (in which case check Err() for errors).
 // After reading Record is avilable
 func (r *Reader) ReadNextRecord() bool {
-	done := r.ReadNextData()
-	if done {
+	ok := r.ReadNextData()
+	if !ok {
 		return false
 	}
 
