@@ -245,16 +245,30 @@ func TestIntStrLen(t *testing.T) {
 	n1 := 1
 	n2 := -1
 	for i := 0; i < 10; i++ {
-		n1 := n1*10 + i + 1
-		numbers = append(numbers, n1)
-		n2 := n2*10 - i - 1
-		numbers = append(numbers, n2)
+		n1 = n1*10 + i + 1
+		n2 = n2*10 - i - 1
+		numbers = append(numbers, n1, n2)
 	}
 	for _, n := range numbers {
 		got := intStrLen(n)
 		exp := len(strconv.Itoa(n))
 		assert.Equal(t, exp, got)
 	}
+}
+
+func testDump(t *testing.T) {
+	var buf bytes.Buffer
+	w := NewWriter(&buf)
+	var rec Record
+	rec.Name = "httplog"
+	// you can append multiple key/value pairs at once
+	rec.Append("url", "https://blog.kowalczyk.info")
+	rec.Append("ipaddr", "10.0.0.1")
+	// or assemble with multiple calls
+	rec.Append("code", strconv.Itoa(200))
+	_, err := w.WriteRecord(&rec)
+	assert.NoError(t, err)
+	fmt.Printf("s:\n%s\n", string(buf.Bytes()))
 }
 
 func dumpRec(rec *Record) {

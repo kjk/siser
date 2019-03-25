@@ -22,43 +22,53 @@ This library is meant to be a middle ground:
 Imagine you want log basic info about http requests.
 
 ```go
-func logHTTPRequest(w io.Writer, url string, ipAddr string, statusCode int) error {
-	var r siser.Record
+func createWriter() (*siser.Writer, error) {
+	f, err := os.Create("http_access.log")
+	if err != nil {
+		return nil, err
+	}
+	w := siser.NewWriter(f)
+	return w, nil
+}
+
+func logHTTPRequest(w *siser.Writer, url string, ipAddr string, statusCode int) error {
+	var rec siser.Record
 	// you can append multiple key/value pairs at once
-	r.Append("url", url, "ipaddr", ipAddr)
+	rec.Append("url", url, "ipaddr", ipAddr)
 	// or assemble with multiple calls
-	r.Append("code", strconv.Itoa(statusCode))
-	d := r.Marshal()
-	_, err := w.Write(d)
+	rec.Append("code", strconv.Itoa(statusCode))
+	_, err := w.WriteRecord(&rec)
 	return err
 }
 ```
 
-The data will be serialized as following:
+The data will be written to writer underlying `siser.Writer` as:
 ```
-url: http://blog.kowalczyk.info/index.html
+61 1553488435903 httplog
+url: https://blog.kowalczyk.info
 ipaddr: 10.0.0.1
 code: 200
----
 ```
 
-Re-inventing the wheel, I know, there are existing formats for logging
-http requests. The good thing about this format is that it can be used
-for arbitrary data that can be represented as key/value pairs
+Here's what and why:
+* `61` is the size of the data. This allows us to read the exact number of bytes in the record
+* `1553488435903` is a timestamp which is Unix epoch time in milliseconds (more precision than standard Unix time which is in seconds)
+* `httplog` is optional name of the record. This allows you to easily write multiple types of records to a file
 
-We also need to read the data back. Let's assume you wrote the data to
-a file `http_access.log`. To read all records from the file:
+To read all records from the file:
 ```go
 f, err := os.Open("http_access.log")
 fatalIfErr(err)
 defer f.Close()
-r := siser.NewReader(f)
-for r.ReadNext() {
-	_, record := r.Record()
-	code, ok := r.Get("code")
-	// get rest of values and do something with them
+reader := siser.NewReader(f)
+for reader.ReadNextRecord() {
+	rec := r.Record
+	name := rec.Name // "httplog"
+	timestamp := rec.Timestamp
+	code, ok := rec.Get("code")
+	// get rest of values and and do something with them
 }
-fatalIfErr(r.Err())
+fatalIfErr(rec.Err())
 ```
 
 ## Usage scenarios
