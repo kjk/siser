@@ -61,7 +61,11 @@ func (r *Reader) ReadNextData() bool {
 	// ${name} is optional
 	hdr, err := r.r.ReadBytes('\n')
 	if err != nil {
-		r.err = err
+		if err == io.EOF {
+			r.done = true
+		} else {
+			r.err = err
+		}
 		return false
 	}
 	r.currStreamPos += int64(len(hdr))
@@ -82,7 +86,7 @@ func (r *Reader) ReadNextData() bool {
 	} else {
 		// timestamp and name
 		timestamp = rest[:idx]
-		name = rest[idx:]
+		name = rest[idx+1:]
 	}
 
 	size, err := strconv.ParseInt(string(dataSize), 10, 64)
