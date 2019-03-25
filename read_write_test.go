@@ -218,6 +218,25 @@ func BenchmarkSiserMarshal(b *testing.B) {
 	}
 }
 
+func BenchmarkSiserMarshal2(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		rec.Reset()
+		durMs := float64(1.41) / float64(time.Millisecond)
+		durStr := strconv.FormatFloat(durMs, 'f', 2, 64)
+		rec.Append(
+			"uri", "/atom.xml",
+			"code", strconv.Itoa(200),
+			"ip", "54.186.248.49",
+			"dur", durStr,
+			"when", time.Now().Format(time.RFC3339),
+			"size", strconv.Itoa(35286),
+			"ua", "Feedspot http://www.feedspot.com",
+			"referer", "http://blog.kowalczyk.info/feed")
+		// assign to global to prevents optimizing the loop
+		globalData = rec.Marshal()
+	}
+}
+
 func BenchmarkJSONMarshal(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		rec := testRecJSON{
