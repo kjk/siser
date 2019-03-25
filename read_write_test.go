@@ -74,6 +74,7 @@ ho
 	for r.ReadNextData() {
 		assert.Equal(t, strings[n], string(r.Data))
 		assert.Equal(t, names[n], string(r.Name))
+		assert.True(t, r.Timestamp.Equal(tm))
 		n++
 	}
 	assert.NoError(t, r.Err())
@@ -110,6 +111,9 @@ func testMany(t *testing.T, name string) {
 	var buf bytes.Buffer
 	w := NewWriter(&buf)
 
+	// we can't compare timestamp directly but as truncated to milliseconds
+	now := TimeFromUnixMillisecond(TimeToUnixMillisecond(time.Now()))
+
 	rec := &Record{}
 	var positions []int64
 	var currPos int64
@@ -117,6 +121,7 @@ func testMany(t *testing.T, name string) {
 	for i := 0; i < nRecs; i++ {
 		rec.Reset()
 		rec.Name = name
+		rec.Timestamp = now
 		nRand := rand.Intn(1024)
 		rec.Append("counter", strconv.Itoa(i), "random", strconv.Itoa(nRand))
 		if i%12 == 0 {
@@ -147,6 +152,7 @@ func testMany(t *testing.T, name string) {
 		_, ok = rec.Get("random")
 		assert.True(t, ok)
 		assert.Equal(t, rec.Name, name)
+		assert.True(t, rec.Timestamp.Equal(now), "timestamp: %s, now: %s", rec.Timestamp, now)
 		i++
 	}
 	assert.NoError(t, reader.Err())
