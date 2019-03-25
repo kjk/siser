@@ -192,9 +192,9 @@ func UnmarshalRecord(d []byte, r *Record) (*Record, error) {
 // Unmarshal resets record and decodes data as created by Marshal
 // into it.
 func (r *Record) Unmarshal(d []byte) error {
-	r2, err := UnmarshalRecord(d, r)
-	panicIf(r2 == nil && err == nil)
-	panicIf(err == nil && r2 != nil)
-	panicIf(r2 != nil && r2 != r)
+	rec, err := UnmarshalRecord(d, r)
+	panicIf(err == nil && rec == nil, "should return err or rec")
+	panicIf(err != nil && rec != nil, "if error, rec should be nil")
+	panicIf(rec != nil && rec != r, "if returned rec, must be same as r")
 	return err
 }

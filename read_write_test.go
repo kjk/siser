@@ -46,32 +46,29 @@ func testRoundTrip(t *testing.T, recIn *Record) string {
 	return string(d)
 }
 
-/*
-func testWriter(t *testing.T, format Format) {
+func TestWriter(t *testing.T) {
 	strings := []string{"hey\n", "ho"}
 	names := []string{"", "with name"}
-	expPrefix := `4
+	exp := `4 5000
 hey
-2 with name
+2 5000 with name
 ho
 `
 	var err error
 	buf := &bytes.Buffer{}
 	w := NewWriter(buf)
-	w.Format = format
 	unixNano := 5 * time.Second
 	tm := time.Unix(0, int64(unixNano))
 	for i, s := range strings {
 		name := names[i]
-		_, err = w.WriteNamed([]byte(s), tm, name)
+		_, err = w.Write([]byte(s), tm, name)
 		assert.NoError(t, err)
 	}
 	s := buf.String()
-	assert.Equal(t, expPrefix, s)
-	buf = bytes.NewBufferString(expPrefix)
+	assert.Equal(t, exp, s)
 
-	r := NewReader(buf)
-	r.Format = format
+	buf = bytes.NewBufferString(exp)
+	r := NewReader(bufio.NewReader(buf))
 	n := 0
 	for r.ReadNextData() {
 		assert.Equal(t, strings[n], string(r.Data))
@@ -80,7 +77,6 @@ ho
 	}
 	assert.NoError(t, r.Err())
 }
-*/
 
 func TestRecordSerializeSimple(t *testing.T) {
 	var r Record
@@ -193,17 +189,6 @@ func dumpRec(rec *Record) {
 	d := rec.Marshal()
 	fmt.Printf("%s", string(d))
 }
-
-/*
-uri: /atom.xml
-code: 200
-ip: 54.186.248.49
-dur: 1.41
-when: 2017-07-09T05:26:55Z
-size: 35286
-ua: Feedspot http://www.feedspot.com
-referer: http://blog.kowalczyk.info/feed
-*/
 
 var rec Record
 var globalData []byte
