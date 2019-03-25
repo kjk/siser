@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"strconv"
 	"testing"
 	"time"
@@ -100,18 +101,14 @@ func TestRecordSerializeSimple3(t *testing.T) {
 	assert.Equal(t, exp, got)
 }
 
-/*
-func testMany(t *testing.T, name string) {
-	path := "test.txt"
-	os.Remove(path)
-	f, err := os.Create(path)
-	assert.NoError(t, err)
-	if err != nil {
-		return
-	}
-	defer os.Remove(path)
+func TestMany(t *testing.T) {
+	testMany(t, "")
+	testMany(t, "named")
+}
 
-	w := NewWriter(f)
+func testMany(t *testing.T, name string) {
+	var buf bytes.Buffer
+	w := NewWriter(&buf)
 
 	rec := &Record{}
 	var positions []int64
@@ -136,18 +133,12 @@ func testMany(t *testing.T, name string) {
 		currPos += int64(n)
 	}
 
-	err = f.Close()
-	assert.NoError(t, err)
-
-	f, err = os.Open(path)
-	assert.NoError(t, err)
-	defer f.Close()
-
+	f := bufio.NewReader(bytes.NewBuffer(buf.Bytes()))
 	reader := NewReader(f)
-	reader.Format = format
 	i := 0
-	for reader.ReadNext() {
-		recPos, rec := reader.Record()
+	for reader.ReadNextRecord() {
+		rec := reader.Record
+		recPos := reader.CurrPos
 		assert.Equal(t, positions[i], recPos)
 		counter, ok := rec.Get("counter")
 		assert.True(t, ok)
@@ -161,7 +152,6 @@ func testMany(t *testing.T, name string) {
 	assert.NoError(t, reader.Err())
 	assert.Equal(t, nRecs, i)
 }
-*/
 
 func TestAppendPanics(t *testing.T) {
 	rec := &Record{}
