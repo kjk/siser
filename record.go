@@ -75,7 +75,7 @@ func nonEmptyEndsWithNewline(s string) bool {
 // return true if value needs to be serialized in long,
 // size-prefixed format
 func needsLongFormat(s string) bool {
-	return len(s) > 120 || !isASCII(s)
+	return len(s) == 0 || len(s) > 120 || !isASCII(s)
 }
 
 // Marshal converts record to bytes
