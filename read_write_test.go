@@ -219,8 +219,13 @@ func testMany(t *testing.T, name string) {
 	i := 0
 	for reader.ReadNextRecord() {
 		rec := reader.Record
-		recPos := reader.CurrPos
-		assert.Equal(t, positions[i], recPos)
+		recPos := reader.CurrRecordPos
+		assert.Equal(t, recPos, positions[i])
+		if i < len(positions)-1 {
+			nextRecPos := reader.NextRecordPos
+			assert.Equal(t, nextRecPos, positions[i+1])
+		}
+
 		counter, ok := rec.Get("counter")
 		assert.True(t, ok)
 		exp := strconv.Itoa(i)

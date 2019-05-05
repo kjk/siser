@@ -13,11 +13,12 @@ import (
 type Reader struct {
 	r *bufio.Reader
 
-	// Record is available after ReadNextRecord() and over-written
-	// in next ReadNextRecord()
+	// Record is available after ReadNextRecord().
+	// It's over-written in next ReadNextRecord().
 	Record *Record
 
-	// Data / Name / Timestampe are available after calling ReadNextData
+	// Data / Name / Timestampe are available after ReadNextData.
+	// They are over-written in next ReadNextData.
 	Data      []byte
 	Name      string
 	Timestamp time.Time
@@ -25,11 +26,15 @@ type Reader struct {
 	// position of the current record within the reader.
 	// We keep track of it so that callers can index records
 	// by offset and seek to it
-	CurrPos int64
+	CurrRecordPos int64
 
-	currStreamPos int64
-	err           error
-	done          bool
+	// position of the next record within the reader.
+	NextRecordPos int64
+
+	err error
+
+	// true if reached end of file with io.EOF
+	done bool
 }
 
 // NewReader creates a new reader
@@ -40,6 +45,7 @@ func NewReader(r *bufio.Reader) *Reader {
 	}
 }
 
+// Done returns true if we're finished reading from the reader
 func (r *Reader) Done() bool {
 	return r.err != nil || r.done
 }
@@ -54,7 +60,7 @@ func (r *Reader) ReadNextData() bool {
 		return false
 	}
 	r.Name = ""
-	r.CurrPos = r.currStreamPos
+	r.CurrRecordPos = r.NextRecordPos
 
 	// read header in the format:
 	// "${size} ${timestamp_in_unix_epoch_ms} ${name}\n"
@@ -68,7 +74,7 @@ func (r *Reader) ReadNextData() bool {
 		}
 		return false
 	}
-	r.currStreamPos += int64(len(hdr))
+	r.NextRecordPos += int64(len(hdr))
 	rest := hdr[:len(hdr)-1] // remove '\n' from end
 	idx := bytes.IndexByte(rest, ' ')
 	if idx == -1 {
@@ -120,7 +126,7 @@ func (r *Reader) ReadNextData() bool {
 		return false
 	}
 	panicIf(n != len(r.Data))
-	r.currStreamPos += int64(n)
+	r.NextRecordPos += int64(n)
 
 	// account for the fact that for readability we might
 	// have padded data with '\n'
@@ -128,7 +134,7 @@ func (r *Reader) ReadNextData() bool {
 	if len(d) > 0 {
 		if d[0] == '\n' {
 			_, err = r.r.ReadByte()
-			r.currStreamPos++
+			r.NextRecordPos++
 		}
 	} else {
 		if err == io.EOF {
@@ -142,9 +148,11 @@ func (r *Reader) ReadNextData() bool {
 	return true
 }
 
-// ReadNextData reads a block of data. Returns false if there are
-// no more record (in which case check Err() for errors).
-// After reading Record is avilable
+// ReadNextRecord reads a key / value record.
+// Returns false if there are no more record.
+// Check Err() for errors.
+// After reading information is in Record (valid until
+// next read).
 func (r *Reader) ReadNextRecord() bool {
 	ok := r.ReadNextData()
 	if !ok {
