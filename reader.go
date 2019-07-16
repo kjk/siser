@@ -74,7 +74,7 @@ func (r *Reader) ReadNextData() bool {
 		}
 		return false
 	}
-	r.NextRecordPos += int64(len(hdr))
+	recSize := len(hdr)
 	rest := hdr[:len(hdr)-1] // remove '\n' from end
 	idx := bytes.IndexByte(rest, ' ')
 	if idx == -1 {
@@ -126,25 +126,22 @@ func (r *Reader) ReadNextData() bool {
 		return false
 	}
 	panicIf(n != len(r.Data))
-	r.NextRecordPos += int64(n)
+	recSize += n
 
 	// account for the fact that for readability we might
 	// have padded data with '\n'
-	d, err := r.r.Peek(1)
-	if len(d) > 0 {
-		if d[0] == '\n' {
-			_, err = r.r.ReadByte()
-			r.NextRecordPos++
+	// same as needsNewline logic in Writer.Write
+	n = len(r.Data)
+	needsNewline := (n > 0) && (r.Data[n-1] != '\n')
+	if needsNewline {
+		_, err = r.r.Discard(1)
+		if err != nil {
+			r.err = err
+			return false
 		}
-	} else {
-		if err == io.EOF {
-			err = nil
-		}
+		recSize++
 	}
-	if err != nil {
-		r.err = err
-		return false
-	}
+	r.NextRecordPos += int64(recSize)
 	return true
 }
 

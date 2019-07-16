@@ -104,37 +104,87 @@ func testWriterRoundTrip(t *testing.T, r *Record) {
 	assert.True(t, r.Timestamp.IsZero() || timeDiffLessThanMs(rec.Timestamp, r.Timestamp), "rec.Timestamp: %s, r.Timestamp: %s, diff: %s", rec.Timestamp, r.Timestamp, timeDiff(rec.Timestamp, r.Timestamp))
 }
 
+type testRec struct {
+	s    string
+	name string
+	pos  int
+}
+
+func mkTestRec(s string, name string) *testRec {
+	return &testRec{
+		s:    s,
+		name: name,
+	}
+}
+
+func writeData(t *testing.T, tests []*testRec) *bytes.Buffer {
+	buf := &bytes.Buffer{}
+	// fixed time so that we can
+	unixNano := 5 * time.Second
+	tm := time.Unix(0, int64(unixNano))
+	w := NewWriter(buf)
+	currPos := 0
+	for _, test := range tests {
+		test.pos = currPos
+		n, err := w.Write([]byte(test.s), tm, test.name)
+		assert.NoError(t, err)
+		currPos += n
+	}
+	return buf
+}
+
+func readAndVerifyData(t *testing.T, buf *bytes.Buffer, tests []*testRec) int64 {
+	unixNano := 5 * time.Second
+	tm := time.Unix(0, int64(unixNano))
+	r := NewReader(bufio.NewReader(buf))
+	n := 0
+	for n < len(tests) && r.ReadNextData() {
+		test := tests[n]
+		assert.Equal(t, test.s, string(r.Data))
+		assert.Equal(t, test.name, string(r.Name))
+		assert.True(t, r.Timestamp.Equal(tm))
+		expPos := int64(test.pos)
+		assert.Equal(t, expPos, r.CurrRecordPos)
+		n++
+	}
+	assert.NoError(t, r.Err())
+	return r.NextRecordPos
+}
+
 func TestWriter(t *testing.T) {
-	strings := []string{"hey\n", "ho"}
-	names := []string{"", "with name"}
+	tests := []*testRec{
+		mkTestRec("hey\n", ""),
+		mkTestRec("ho", "with name"),
+	}
 	exp := `4 5000
 hey
 2 5000 with name
 ho
 `
-	var err error
-	buf := &bytes.Buffer{}
-	w := NewWriter(buf)
-	unixNano := 5 * time.Second
-	tm := time.Unix(0, int64(unixNano))
-	for i, s := range strings {
-		name := names[i]
-		_, err = w.Write([]byte(s), tm, name)
-		assert.NoError(t, err)
-	}
-	s := buf.String()
-	assert.Equal(t, exp, s)
+	buf := writeData(t, tests)
+	d := buf.Bytes()
+	assert.Equal(t, exp, string(d))
 
-	buf = bytes.NewBufferString(exp)
-	r := NewReader(bufio.NewReader(buf))
-	n := 0
-	for r.ReadNextData() {
-		assert.Equal(t, strings[n], string(r.Data))
-		assert.Equal(t, names[n], string(r.Name))
-		assert.True(t, r.Timestamp.Equal(tm))
-		n++
+	readAndVerifyData(t, bytes.NewBuffer(d), tests)
+}
+
+func TestWriterBug(t *testing.T) {
+	// we had a bug where file that starts with '\n' would cause problems
+	// because of the padding we add in writer but didn't properly
+	// account in reader
+	tests := []*testRec{
+		// "foo" ends with newline, so we won't add it when
+		// writing a record
+		mkTestRec("foo\n", "foo.txt"),
 	}
-	assert.NoError(t, r.Err())
+
+	buf := writeData(t, tests)
+	expPos := int64(buf.Len())
+	buf.WriteString("\nstarts with new line")
+
+	buf2 := bytes.NewBuffer(buf.Bytes())
+	gotPos := readAndVerifyData(t, buf2, tests)
+	assert.Equal(t, expPos, gotPos)
 }
 
 func TestRecordSerializeSimple(t *testing.T) {
