@@ -141,20 +141,19 @@ func UnmarshalRecord(d []byte, r *Record) (*Record, error) {
 	for len(d) > 0 {
 		idx := bytes.IndexByte(d, '\n')
 		if idx == -1 {
-			return nil, fmt.Errorf("Missing '\n' marking end of header in '%s'", string(d))
+			return nil, fmt.Errorf("missing '\n' marking end of header in '%s'", string(d))
 		}
 		line := d[:idx]
 		d = d[idx+1:]
-		n := len(line)
 		idx = bytes.IndexByte(line, ':')
 		if idx == -1 {
-			return nil, fmt.Errorf("Line in unrecognized format: '%s'", line)
+			return nil, fmt.Errorf("line in unrecognized format: '%s'", line)
 		}
 		key := line[:idx]
 		val := line[idx+1:]
 		// at this point val must be at least one character (' ' or '+')
 		if len(val) < 1 {
-			return nil, fmt.Errorf("Line in unrecognized format: '%s'", line)
+			return nil, fmt.Errorf("line in unrecognized format: '%s'", line)
 		}
 		kind := val[0]
 		val = val[1:]
@@ -164,7 +163,7 @@ func UnmarshalRecord(d []byte, r *Record) (*Record, error) {
 		}
 
 		if kind != '+' {
-			return nil, fmt.Errorf("Line in unrecognized format: '%s'", line)
+			return nil, fmt.Errorf("line in unrecognized format: '%s'", line)
 		}
 
 		n, err := strconv.Atoi(string(val))
@@ -172,7 +171,7 @@ func UnmarshalRecord(d []byte, r *Record) (*Record, error) {
 			return nil, err
 		}
 		if n > len(d) {
-			return nil, fmt.Errorf("Length of value %d greater than remaining data of size %d", n, len(d))
+			return nil, fmt.Errorf("length of value %d greater than remaining data of size %d", n, len(d))
 		}
 		val = d[:n]
 		d = d[n:]

@@ -78,7 +78,7 @@ func (r *Reader) ReadNextData() bool {
 	rest := hdr[:len(hdr)-1] // remove '\n' from end
 	idx := bytes.IndexByte(rest, ' ')
 	if idx == -1 {
-		r.err = fmt.Errorf("Unxpected header '%s'", string(hdr))
+		r.err = fmt.Errorf("unexpected header '%s'", string(hdr))
 		return false
 	}
 	dataSize := rest[:idx]
@@ -97,13 +97,13 @@ func (r *Reader) ReadNextData() bool {
 
 	size, err := strconv.ParseInt(string(dataSize), 10, 64)
 	if err != nil {
-		r.err = fmt.Errorf("Unxpected header '%s'", string(hdr))
+		r.err = fmt.Errorf("unexpected header '%s'", string(hdr))
 		return false
 	}
 
 	timeMs, err := strconv.ParseInt(string(timestamp), 10, 64)
 	if err != nil {
-		r.err = fmt.Errorf("Unxpected header '%s'", string(hdr))
+		r.err = fmt.Errorf("unexpected header '%s'", string(hdr))
 		return false
 	}
 	r.Timestamp = TimeFromUnixMillisecond(timeMs)
@@ -115,7 +115,7 @@ func (r *Reader) ReadNextData() bool {
 		r.Data = nil
 	}
 	if size > int64(cap(r.Data)) {
-		r.Data = make([]byte, size, size)
+		r.Data = make([]byte, size)
 	} else {
 		// re-use existing buffer
 		r.Data = r.Data[:size]

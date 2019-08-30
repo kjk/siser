@@ -35,10 +35,6 @@ func init() {
 	genSerializedJSON()
 }
 
-func bufReaderFromBytes(d []byte) *bufio.Reader {
-	return bufio.NewReader(bytes.NewBuffer(d))
-}
-
 func timeDiff(t1 time.Time, t2 time.Time) time.Duration {
 	dur := t1.Sub(t2)
 	if dur < 0 {
@@ -309,26 +305,6 @@ func TestIntStrLen(t *testing.T) {
 		exp := len(strconv.Itoa(n))
 		assert.Equal(t, exp, got)
 	}
-}
-
-func testDump(t *testing.T) {
-	var buf bytes.Buffer
-	w := NewWriter(&buf)
-	var rec Record
-	rec.Name = "httplog"
-	// you can append multiple key/value pairs at once
-	rec.Append("url", "https://blog.kowalczyk.info")
-	rec.Append("ipaddr", "10.0.0.1")
-	// or assemble with multiple calls
-	rec.Append("code", strconv.Itoa(200))
-	_, err := w.WriteRecord(&rec)
-	assert.NoError(t, err)
-	fmt.Printf("s:\n%s\n", string(buf.Bytes()))
-}
-
-func dumpRec(rec *Record) {
-	d := rec.Marshal()
-	fmt.Printf("%s", string(d))
 }
 
 var rec Record

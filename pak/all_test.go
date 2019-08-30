@@ -9,14 +9,6 @@ import (
 	"github.com/alecthomas/assert"
 )
 
-func loadFile(t *testing.T, path string) []byte {
-	d, err := ioutil.ReadFile(path)
-	if err != nil {
-		t.Fatalf("ioutil.ReadFile() failed with %s", err)
-	}
-	return d
-}
-
 func must(err error) {
 	if err != nil {
 		panic(err.Error())

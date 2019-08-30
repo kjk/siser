@@ -54,14 +54,6 @@ func sha1HexOfBytes(d []byte) string {
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
-func sha1HexOfFile(path string) (string, error) {
-	d, err := ioutil.ReadFile(path)
-	if err != nil {
-		return "", err
-	}
-	return sha1HexOfBytes(d), nil
-}
-
 // AddFile adds a file from disk to the archive. If meta has "Path"
 // value, it'll over-write path of the file in meta-data
 func (w *Writer) AddFile(path string, meta Metadata) error {

@@ -14,7 +14,7 @@ import (
 
 var (
 	// ErrNoPath is returned when path is not provided
-	ErrNoPath = errors.New("No Path provided")
+	ErrNoPath = errors.New("no Path provided")
 )
 
 // Entry represents a single file in the archive
