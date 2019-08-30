@@ -23,4 +23,3 @@ jobs:
           tar --strip-components 1 -C . -xf staticcheck.tar.gz staticcheck/staticcheck
           chmod ug+x ./staticcheck
           ./staticcheck ./...
-        |
