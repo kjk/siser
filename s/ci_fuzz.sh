@@ -25,16 +25,16 @@ clang -fsanitize=fuzzer ${TARGET}.a -o ${TARGET}
 # or latest version:
 # https://github.com/fuzzitdev/fuzzit/releases/latest/download/fuzzit_Linux_x86_64
 wget -q -O fuzzit https://github.com/fuzzitdev/fuzzit/releases/download/v2.4.35/fuzzit_Linux_x86_64
-chmod a+x fuzzit
+chmod a+x ./fuzzit
 
 # upload fuzz target for long fuzz testing on fuzzit.dev server
-# or run locally for regression, depending on --type
+# or run locally for regression
 if [ "${GITHUB_ACTION}" == "push" ]; then
 	TYPE=fuzzing
-else if [ ${GITHUB_ACTION} == "pull_request" ]; then
+else if [ "${GITHUB_ACTION}" == "pull_request" ]; then
 	TYPE=local-regression
 else
-    echo "Unsupported action ${GITHUB_ACTION}"
+    echo "Unexpected action '${GITHUB_ACTION}'"
     exit 1
 fi
 
