@@ -18,7 +18,6 @@ PATH=${PATH}:"${GOB}"
 # before using `fuzzit create job`
 TARGET=siser
 
-go get -u ./...
 go-fuzz-build -libfuzzer -o ${TARGET}.a .
 clang -fsanitize=fuzzer ${TARGET}.a -o ${TARGET}
 
