@@ -5,7 +5,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
+	"os"
+	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
@@ -47,6 +50,32 @@ func timeDiffLessThanMs(t1 time.Time, t2 time.Time) bool {
 	return timeDiff(t1, t2) < time.Millisecond
 }
 
+func must(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+var (
+	testNo int
+)
+
+// writes a valid test case for fuzzing corpus
+// only if GEN_FUZZ_CORPUS env variable is set
+func writeCorpus(d []byte) {
+	if os.Getenv("GEN_FUZZ_CORPUS") == "" {
+		return
+	}
+	dir := "fuzz_corpus"
+	err := os.MkdirAll(dir, 0755)
+	must(err)
+	testNo++
+	name := fmt.Sprintf("test%d.txt", testNo)
+	path := filepath.Join(dir, name)
+	err = ioutil.WriteFile(path, d, 0644)
+	must(err)
+}
+
 func testRoundTrip(t *testing.T, r *Record) string {
 	d := r.Marshal()
 	rec, err := UnmarshalRecord(d, nil)
@@ -60,6 +89,7 @@ func testRoundTrip(t *testing.T, r *Record) string {
 	assert.Equal(t, rec2.Entries, r.Entries)
 
 	testWriterRoundTrip(t, r)
+	writeCorpus(d)
 
 	return string(d)
 }
@@ -221,6 +251,25 @@ func TestRecordSerializeSimple3(t *testing.T) {
 	r.Append("long key", largeValue)
 	got := testRoundTrip(t, &r)
 	exp := fmt.Sprintf("long key:+%d\n%s\n", len(largeValue), largeValue)
+	assert.Equal(t, exp, got)
+}
+
+func TestRecordSerializeSimple4(t *testing.T) {
+	var r Record
+	r.Append("k2", "a\nb")
+	r.Append("", "no name")
+	r.Append("bu", "gatti ")
+	r.Append("no value", "")
+	r.Append("bu", "  gatti")
+	got := testRoundTrip(t, &r)
+	exp := `k2:+3
+a
+b
+: no name
+bu: gatti 
+no value:+0
+bu:   gatti
+`
 	assert.Equal(t, exp, got)
 }
 
