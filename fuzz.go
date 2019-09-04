@@ -1,5 +1,7 @@
 // +build gofuzz
 
+package siser
+
 func Fuzz(d []byte) int {
 	_, err := UnmarshalRecord(d)
 	if err == nil {
