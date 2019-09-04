@@ -31,7 +31,7 @@ chmod a+x ./fuzzit
 # or run locally for regression
 if [ "${GITHUB_ACTION}" == "push" ]; then
 	TYPE=fuzzing
-else if [ "${GITHUB_ACTION}" == "pull_request" ]; then
+elif [ "${GITHUB_ACTION}" == "pull_request" ]; then
 	TYPE=local-regression
 else
     echo "Unexpected action '${GITHUB_ACTION}'"
