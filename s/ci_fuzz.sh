@@ -9,9 +9,8 @@ export GO111MODULE="off"
 go get -u github.com/dvyukov/go-fuzz/go-fuzz github.com/dvyukov/go-fuzz/go-fuzz-build
 
 # TODO: needed until https://github.com/actions/setup-go/issues/14 is fixed
+# adds GOBIN to PATH so that go-fuzz-build is visible
 GOB="$(go env GOPATH)/bin"
-echo "GOB: ${GOB}"
-ls -lah "${GOB}"
 PATH=PATH:"${GOB}"
 
 # target name can only contain lower-case letters (a-z), digits (0-9) and a dash (-)
@@ -19,7 +18,8 @@ PATH=PATH:"${GOB}"
 # before using `fuzzit create job`
 TARGET=siser
 
-go-fuzz-build -libfuzzer -o ${TARGET}.a github.com/kjk/siser
+go get -u ./...
+go-fuzz-build -libfuzzer -o ${TARGET}.a .
 clang -fsanitize=fuzzer ${TARGET}.a -o ${TARGET}
 
 # install fuzzit for talking to fuzzit.dev service
