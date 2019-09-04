@@ -29,12 +29,12 @@ chmod a+x ./fuzzit
 
 # upload fuzz target for long fuzz testing on fuzzit.dev server
 # or run locally for regression
-if [ "${GITHUB_ACTION}" == "push" ]; then
+if [ "${GITHUB_EVENT_NAME}" == "push" ]; then
 	TYPE=fuzzing
-elif [ "${GITHUB_ACTION}" == "pull_request" ]; then
+elif [ "${GITHUB_EVENT_NAME}" == "pull_request" ]; then
 	TYPE=local-regression
 else
-    echo "Unexpected action '${GITHUB_ACTION}'"
+    echo "Unexpected event '${GITHUB_EVENT_NAME}'"
     exit 1
 fi
 
