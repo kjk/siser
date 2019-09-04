@@ -3,7 +3,6 @@ package siser
 import (
 	"bufio"
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -15,7 +14,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -358,6 +356,7 @@ func TestIntStrLen(t *testing.T) {
 	}
 }
 
+/*
 // TODO: fix the crash
 func testCrashes(t *testing.T) {
 	tests := []string{
@@ -369,6 +368,7 @@ func testCrashes(t *testing.T) {
 		_, _ = UnmarshalRecord(d, nil)
 	}
 }
+*/
 
 var rec Record
 var globalData []byte
