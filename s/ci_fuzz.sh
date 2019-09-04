@@ -8,6 +8,12 @@ export GO111MODULE="off"
 # install go-fuzz
 go get -u github.com/dvyukov/go-fuzz/go-fuzz github.com/dvyukov/go-fuzz/go-fuzz-build
 
+# TODO: needed until https://github.com/actions/setup-go/issues/14 is fixed
+GOB="$(go env GOPATH)/bin"
+echo "GOB: ${GOB}"
+ls -lah "${GOB}"
+PATH=PATH:"${GOB}"
+
 # target name can only contain lower-case letters (a-z), digits (0-9) and a dash (-)
 # to add another target, make sure to create it with `fuzzit create target`
 # before using `fuzzit create job`
