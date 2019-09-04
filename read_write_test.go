@@ -3,6 +3,7 @@ package siser
 import (
 	"bufio"
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -353,6 +355,18 @@ func TestIntStrLen(t *testing.T) {
 		got := intStrLen(n)
 		exp := len(strconv.Itoa(n))
 		assert.Equal(t, exp, got)
+	}
+}
+
+// TODO: fix the crash
+func testCrashes(t *testing.T) {
+	tests := []string{
+		"/yBrZXk6Ky0yMAoA+f//+zA=",
+	}
+	for _, tc := range tests {
+		d, err := base64.StdEncoding.DecodeString(tc)
+		require.NoError(t, err)
+		_, _ = UnmarshalRecord(d, nil)
 	}
 }
 
