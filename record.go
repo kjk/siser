@@ -69,7 +69,8 @@ func (r *Record) Get(key string) (string, bool) {
 }
 
 func nonEmptyEndsWithNewline(s string) bool {
-	return len(s) == 0 || s[len(s)-1] == '\n'
+	n := len(s)
+	return n == 0 || s[n-1] == '\n'
 }
 
 // return true if value needs to be serialized in long,
@@ -80,31 +81,7 @@ func needsLongFormat(s string) bool {
 
 // Marshal converts record to bytes
 func (r *Record) Marshal() []byte {
-	nEntries := len(r.Entries)
-	if nEntries == 0 {
-		return nil
-	}
-	// calculate size of serialized data so that we can pre-allocate buffer
-	n := 0
-	for _, e := range r.Entries {
-		val := e.Value
-		// header line:
-		n += len(e.Key) + 2 // +2 for separator
-		var data string
-		nVal := len(val)
-		if needsLongFormat(val) {
-			data = val
-			nVal = intStrLen(len(data))
-		}
-		n += nVal
-		n += 1 // newline
-		n += len(data)
-		if !nonEmptyEndsWithNewline(data) {
-			n++
-		}
-	}
-
-	buf := make([]byte, 0, n)
+	var buf []byte
 	for _, e := range r.Entries {
 		val := e.Value
 		var sep byte = ' '
@@ -125,7 +102,6 @@ func (r *Record) Marshal() []byte {
 			buf = append(buf, '\n')
 		}
 	}
-	panicIf(len(buf) != cap(buf), "len(buf) != cap(buf) (%d != %d)", len(buf), cap(buf))
 	return buf
 }
 
