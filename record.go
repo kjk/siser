@@ -170,6 +170,9 @@ func UnmarshalRecord(d []byte, r *Record) (*Record, error) {
 		if err != nil {
 			return nil, err
 		}
+		if n < 0 {
+			return nil, fmt.Errorf("negative length %d of data", n)
+		}
 		if n > len(d) {
 			return nil, fmt.Errorf("length of value %d greater than remaining data of size %d", n, len(d))
 		}

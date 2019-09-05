@@ -3,8 +3,10 @@ package siser
 import (
 	"bufio"
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -356,11 +358,10 @@ func TestIntStrLen(t *testing.T) {
 	}
 }
 
-/*
-// TODO: fix the crash
-func testCrashes(t *testing.T) {
+func TestCrashes(t *testing.T) {
 	tests := []string{
 		"/yBrZXk6Ky0yMAoA+f//+zA=",
+		"/QA6Ky03OQowMQAAMw==",
 	}
 	for _, tc := range tests {
 		d, err := base64.StdEncoding.DecodeString(tc)
@@ -368,7 +369,6 @@ func testCrashes(t *testing.T) {
 		_, _ = UnmarshalRecord(d, nil)
 	}
 }
-*/
 
 var rec Record
 var globalData []byte
