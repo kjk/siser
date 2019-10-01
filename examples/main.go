@@ -2,27 +2,22 @@ package main
 
 import (
 	"flag"
-	"fmt"
 )
 
 var (
-	flgCreate bool
+	flgTestHTTPLog bool
 )
 
 func parseFlags() {
-	flag.BoolVar(&flgCreate, "create", false, "if true, creates")
+	flag.BoolVar(&flgTestHTTPLog, "test-http-log", false, "test http log")
 	flag.Parse()
-}
-
-func doCreate() {
-	fmt.Printf("doCrreate()\n")
 }
 
 func main() {
 	parseFlags()
 
-	if flgCreate {
-		doCreate()
+	if flgTestHTTPLog {
+		testHTTPLog()
 		return
 	}
 
