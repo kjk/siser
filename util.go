@@ -54,7 +54,7 @@ func intStrLen(n int) int {
 	return l
 }
 
-func isASCII(s string) bool {
+func serializableOnLine(s string) bool {
 	n := len(s)
 	for i := 0; i < n; i++ {
 		b := s[i]

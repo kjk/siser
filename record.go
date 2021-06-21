@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -24,26 +25,37 @@ type Entry struct {
 }
 
 // Record represents list of key/value pairs that can
-// be serialized/descerialized
+// be serialized/deserialized
 type Record struct {
+	// Entries are available after Unmarshal/UnmarshalRecord
 	Entries []Entry
+	buf     strings.Builder
 	Name    string
 	// when writing, if not provided we use current time
 	Timestamp time.Time
 }
 
-// Append adds key/value pairs to a record
-func (r *Record) Append(args ...string) {
+func (r *Record) appendKeyVal(key, val string) {
+	e := Entry{
+		Key:   key,
+		Value: val,
+	}
+	r.Entries = append(r.Entries, e)
+}
+
+// Write writes key/value pairs to a record.
+// After you write all key/value pairs, call Marshal()
+// to get serialized value (valid until next call to Reset())
+func (r *Record) Write(args ...string) {
 	n := len(args)
 	if n == 0 || n%2 != 0 {
 		panic(fmt.Sprintf("Invalid number of args: %d", len(args)))
 	}
 	for i := 0; i < n; i += 2 {
-		e := Entry{
-			Key:   args[i],
-			Value: args[i+1],
-		}
-		r.Entries = append(r.Entries, e)
+		r.marshalKeyVal(args[i], args[i+1])
+		// TODO: this is for api compat with older version
+		// remove it and fix the tests
+		r.appendKeyVal(args[i], args[i+1])
 	}
 }
 
@@ -56,6 +68,7 @@ func (r *Record) Reset() {
 	r.Name = ""
 	var t time.Time
 	r.Timestamp = t
+	r.buf.Reset()
 }
 
 // Get returns a value for a given key
@@ -76,33 +89,33 @@ func nonEmptyEndsWithNewline(s string) bool {
 // return true if value needs to be serialized in long,
 // size-prefixed format
 func needsLongFormat(s string) bool {
-	return len(s) == 0 || len(s) > 120 || !isASCII(s)
+	return len(s) == 0 || len(s) > 120 || !serializableOnLine(s)
+}
+
+func (r *Record) marshalKeyVal(key, val string) {
+	r.buf.WriteString(key)
+	isLong := needsLongFormat(val)
+	if isLong {
+		r.buf.WriteString(":+")
+		slen := strconv.Itoa(len(val))
+		r.buf.WriteString(slen)
+		r.buf.WriteByte('\n')
+		r.buf.WriteString(val)
+		// for readability: ensure a newline at the end so
+		// that header record always appears on new line
+		if !nonEmptyEndsWithNewline(val) {
+			r.buf.WriteByte('\n')
+		}
+	} else {
+		r.buf.WriteString(": ")
+		r.buf.WriteString(val)
+		r.buf.WriteByte('\n')
+	}
 }
 
 // Marshal converts record to bytes
 func (r *Record) Marshal() []byte {
-	var buf []byte
-	for _, e := range r.Entries {
-		val := e.Value
-		var sep byte = ' '
-		var data string
-		if needsLongFormat(val) {
-			data = val
-			sep = '+'
-			val = strconv.Itoa(len(data))
-		}
-
-		buf = append(buf, e.Key...)
-		buf = append(buf, ':')
-		buf = append(buf, sep)
-		buf = append(buf, val...)
-		buf = append(buf, '\n')
-		buf = append(buf, data...)
-		if !nonEmptyEndsWithNewline(data) {
-			buf = append(buf, '\n')
-		}
-	}
-	return buf
+	return []byte(r.buf.String())
 }
 
 // UnmarshalRecord unmarshall record as marshalled with Record.Marshal
@@ -134,7 +147,7 @@ func UnmarshalRecord(d []byte, r *Record) (*Record, error) {
 		kind := val[0]
 		val = val[1:]
 		if kind == ' ' {
-			r.Append(string(key), string(val))
+			r.appendKeyVal(string(key), string(val))
 			continue
 		}
 
@@ -158,7 +171,7 @@ func UnmarshalRecord(d []byte, r *Record) (*Record, error) {
 		if len(d) > 0 && d[0] == '\n' {
 			d = d[1:]
 		}
-		r.Append(string(key), string(val))
+		r.appendKeyVal(string(key), string(val))
 	}
 	return r, nil
 }

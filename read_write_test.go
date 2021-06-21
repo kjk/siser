@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -14,6 +13,8 @@ import (
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -223,7 +224,7 @@ func TestRecordSerializeSimple(t *testing.T) {
 		assert.Equal(t, 0, len(d))
 	}
 
-	r.Append("key", "val")
+	r.Write("key", "val")
 
 	{
 		v, ok := r.Get("key")
@@ -243,14 +244,14 @@ func TestRecordSerializeSimple(t *testing.T) {
 
 func TestRecordSerializeSimple2(t *testing.T) {
 	var r Record
-	r.Append("k2", "a\nb")
+	r.Write("k2", "a\nb")
 	s := testRoundTrip(t, &r)
 	assert.Equal(t, "k2:+3\na\nb\n", s)
 }
 
 func TestRecordSerializeSimple3(t *testing.T) {
 	var r Record
-	r.Append("long key", largeValue)
+	r.Write("long key", largeValue)
 	got := testRoundTrip(t, &r)
 	exp := fmt.Sprintf("long key:+%d\n%s\n", len(largeValue), largeValue)
 	assert.Equal(t, exp, got)
@@ -258,11 +259,11 @@ func TestRecordSerializeSimple3(t *testing.T) {
 
 func TestRecordSerializeSimple4(t *testing.T) {
 	var r Record
-	r.Append("k2", "a\nb")
-	r.Append("", "no name")
-	r.Append("bu", "gatti ")
-	r.Append("no value", "")
-	r.Append("bu", "  gatti")
+	r.Write("k2", "a\nb")
+	r.Write("", "no name")
+	r.Write("bu", "gatti ")
+	r.Write("no value", "")
+	r.Write("bu", "  gatti")
 	got := testRoundTrip(t, &r)
 	exp := `k2:+3
 a
@@ -296,13 +297,13 @@ func testMany(t *testing.T, name string) {
 		rec.Name = name
 		rec.Timestamp = now
 		nRand := rand.Intn(1024)
-		rec.Append("counter", strconv.Itoa(i), "random", strconv.Itoa(nRand))
+		rec.Write("counter", strconv.Itoa(i), "random", strconv.Itoa(nRand))
 		if i%12 == 0 {
-			rec.Append("large", largeValue)
+			rec.Write("large", largeValue)
 			// test a case where large value is last in the record as well
 			// as being followed by another value
 			if rand.Intn(1024) > 512 {
-				rec.Append("after", "whatever")
+				rec.Write("after", "whatever")
 			}
 		}
 		n, err := w.WriteRecord(rec)
@@ -337,9 +338,9 @@ func testMany(t *testing.T, name string) {
 	assert.Equal(t, nRecs, i)
 }
 
-func TestAppendPanics(t *testing.T) {
+func TestWritePanics(t *testing.T) {
 	rec := &Record{}
-	assert.Panics(t, func() { rec.Append("foo") }, "should panic with even number of arguments")
+	assert.Panics(t, func() { rec.Write("foo") }, "should panic with even number of arguments")
 }
 
 func TestIntStrLen(t *testing.T) {
@@ -387,16 +388,16 @@ type testRecJSON struct {
 func BenchmarkSiserMarshal(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		rec.Reset()
-		rec.Append("uri", "/atom.xml")
-		rec.Append("code", strconv.Itoa(200))
-		rec.Append("ip", "54.186.248.49")
+		rec.Write("uri", "/atom.xml")
+		rec.Write("code", strconv.Itoa(200))
+		rec.Write("ip", "54.186.248.49")
 		durMs := float64(1.41) / float64(time.Millisecond)
 		durStr := strconv.FormatFloat(durMs, 'f', 2, 64)
-		rec.Append("dur", durStr)
-		rec.Append("when", time.Now().Format(time.RFC3339))
-		rec.Append("size", strconv.Itoa(35286))
-		rec.Append("ua", "Feedspot http://www.feedspot.com")
-		rec.Append("referer", "http://blog.kowalczyk.info/feed")
+		rec.Write("dur", durStr)
+		rec.Write("when", time.Now().Format(time.RFC3339))
+		rec.Write("size", strconv.Itoa(35286))
+		rec.Write("ua", "Feedspot http://www.feedspot.com")
+		rec.Write("referer", "http://blog.kowalczyk.info/feed")
 		// assign to global to prevents optimizing the loop
 		globalData = rec.Marshal()
 	}
@@ -407,7 +408,7 @@ func BenchmarkSiserMarshal2(b *testing.B) {
 		rec.Reset()
 		durMs := float64(1.41) / float64(time.Millisecond)
 		durStr := strconv.FormatFloat(durMs, 'f', 2, 64)
-		rec.Append(
+		rec.Write(
 			"uri", "/atom.xml",
 			"code", strconv.Itoa(200),
 			"ip", "54.186.248.49",
@@ -442,16 +443,16 @@ func BenchmarkJSONMarshal(b *testing.B) {
 
 func genSerializedSiser() {
 	var rec Record
-	rec.Append("uri", "/atom.xml")
-	rec.Append("code", strconv.Itoa(200))
-	rec.Append("ip", "54.186.248.49")
+	rec.Write("uri", "/atom.xml")
+	rec.Write("code", strconv.Itoa(200))
+	rec.Write("ip", "54.186.248.49")
 	durMs := float64(1.41) / float64(time.Millisecond)
 	durStr := strconv.FormatFloat(durMs, 'f', 2, 64)
-	rec.Append("dur", durStr)
-	rec.Append("when", time.Now().Format(time.RFC3339))
-	rec.Append("size", strconv.Itoa(35286))
-	rec.Append("ua", "Feedspot http://www.feedspot.com")
-	rec.Append("referer", "http://blog.kowalczyk.info/feed")
+	rec.Write("dur", durStr)
+	rec.Write("when", time.Now().Format(time.RFC3339))
+	rec.Write("size", strconv.Itoa(35286))
+	rec.Write("ua", "Feedspot http://www.feedspot.com")
+	rec.Write("referer", "http://blog.kowalczyk.info/feed")
 	serializedSiser = rec.Marshal()
 }
 
