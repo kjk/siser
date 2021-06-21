@@ -53,6 +53,9 @@ func (r *Record) Write(args ...string) {
 	}
 	for i := 0; i < n; i += 2 {
 		r.marshalKeyVal(args[i], args[i+1])
+		// TODO: this is for api compat with older version
+		// remove it and fix the tests
+		r.appendKeyVal(args[i], args[i+1])
 	}
 }
 
