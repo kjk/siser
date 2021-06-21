@@ -34,9 +34,9 @@ func createWriter() (*siser.Writer, error) {
 func logHTTPRequest(w *siser.Writer, url string, ipAddr string, statusCode int) error {
 	var rec siser.Record
 	// you can append multiple key/value pairs at once
-	rec.Append("url", url, "ipaddr", ipAddr)
+	rec.Write("url", url, "ipaddr", ipAddr)
 	// or assemble with multiple calls
-	rec.Append("code", strconv.Itoa(statusCode))
+	rec.Writes("code", strconv.Itoa(statusCode))
 	_, err := w.WriteRecord(&rec)
 	return err
 }

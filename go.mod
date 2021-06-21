@@ -11,3 +11,5 @@ require (
 )
 
 go 1.12
+
+replace github.com/kjk/siser => ../.

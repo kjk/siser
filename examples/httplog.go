@@ -30,10 +30,10 @@ const (
 
 func writeHTTPReq(httpLogFile *siser.Writer, i *HTTPRequestInfo) error {
 	var r siser.Record
-	r.Append(keyMethod, i.Method)
-	r.Append(keyURL, i.URL)
-	r.Append(keyStatus, strconv.Itoa(i.Status))
-	r.Append(keyResponseSize, strconv.FormatInt(i.ResponseSize, 10))
+	r.Write(keyMethod, i.Method)
+	r.Write(keyURL, i.URL)
+	r.Write(keyStatus, strconv.Itoa(i.Status))
+	r.Write(keyResponseSize, strconv.FormatInt(i.ResponseSize, 10))
 	_, err := httpLogFile.WriteRecord(&r)
 	return err
 }
@@ -115,7 +115,7 @@ func readHTTPLog() error {
 	if r.Err() != nil {
 		return r.Err()
 	}
-	fmt.Printf("Read %d records. URLS:\n", len(urls))
+	fmt.Printf("Read %d records. URLS: %#v\n", len(urls), urls)
 	return nil
 }
 

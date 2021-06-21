@@ -122,7 +122,7 @@ func serializeHeader(entries []*Entry) ([]byte, error) {
 		meta.Set(MetaKeySha1, e.Sha1)
 
 		for _, kv := range meta.Meta {
-			r.Append(kv.Key, kv.Value)
+			r.Write(kv.Key, kv.Value)
 		}
 
 		r.Name = archiveEntryName
