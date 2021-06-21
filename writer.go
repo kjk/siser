@@ -9,6 +9,9 @@ import (
 // Writer writes records to in a structured format
 type Writer struct {
 	w io.Writer
+	// NoTimestamp disables writing timestamp, which
+	// makes serialized data not depend on when they were written
+	NoTimestamp bool
 }
 
 // NewWriter creates a writer
@@ -28,11 +31,16 @@ func (w *Writer) WriteRecord(r *Record) (int, error) {
 // Returns number of bytes written (length of d + lenght of metadata)
 // and an error
 func (w *Writer) Write(d []byte, t time.Time, name string) (int, error) {
-	if t.IsZero() {
-		t = time.Now()
+	var hdr string
+	if w.NoTimestamp {
+		hdr = strconv.Itoa(len(d))
+	} else {
+		if t.IsZero() {
+			t = time.Now()
+		}
+		ms := TimeToUnixMillisecond(t)
+		hdr = strconv.Itoa(len(d)) + " " + strconv.FormatInt(ms, 10)
 	}
-	ms := TimeToUnixMillisecond(t)
-	hdr := strconv.Itoa(len(d)) + " " + strconv.FormatInt(ms, 10)
 	if name != "" {
 		hdr += " " + name
 	}

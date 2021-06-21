@@ -13,6 +13,11 @@ import (
 type Reader struct {
 	r *bufio.Reader
 
+	// hints that the data was written without a timestamp
+	// (see Writer.NoTimestamp). We're permissive i.e. we'll
+	// read timestamp if it's written even if NoTimestamp is true
+	NoTimestamp bool
+
 	// Record is available after ReadNextRecord().
 	// It's over-written in next ReadNextRecord().
 	Record *Record
@@ -64,6 +69,8 @@ func (r *Reader) ReadNextData() bool {
 
 	// read header in the format:
 	// "${size} ${timestamp_in_unix_epoch_ms} ${name}\n"
+	// or (if NoTimestamp):
+	// "${size} ${name}\n"
 	// ${name} is optional
 	hdr, err := r.r.ReadBytes('\n')
 	if err != nil {
@@ -77,18 +84,30 @@ func (r *Reader) ReadNextData() bool {
 	recSize := len(hdr)
 	rest := hdr[:len(hdr)-1] // remove '\n' from end
 	idx := bytes.IndexByte(rest, ' ')
+	var dataSize []byte
 	if idx == -1 {
-		r.err = fmt.Errorf("unexpected header '%s'", string(hdr))
-		return false
+		if !r.NoTimestamp {
+			// with timestamp, we need at least 2 values separated by space
+			r.err = fmt.Errorf("unexpected header '%s'", string(hdr))
+			return false
+		}
+		dataSize = rest
+		rest = nil
+	} else {
+		dataSize = rest[:idx]
+		rest = rest[idx+1:]
 	}
-	dataSize := rest[:idx]
-	rest = rest[idx+1:]
 	var name []byte
 	var timestamp []byte
 	idx = bytes.IndexByte(rest, ' ')
 	if idx == -1 {
-		// no nmae, just timestamp
-		timestamp = rest
+		if r.NoTimestamp {
+			// no timestamp, just name
+			name = rest
+		} else {
+			// no name, just timestamp
+			timestamp = rest
+		}
 	} else {
 		// timestamp and name
 		timestamp = rest[:idx]
@@ -101,12 +120,14 @@ func (r *Reader) ReadNextData() bool {
 		return false
 	}
 
-	timeMs, err := strconv.ParseInt(string(timestamp), 10, 64)
-	if err != nil {
-		r.err = fmt.Errorf("unexpected header '%s'", string(hdr))
-		return false
+	if len(timestamp) > 0 {
+		timeMs, err := strconv.ParseInt(string(timestamp), 10, 64)
+		if err != nil {
+			r.err = fmt.Errorf("unexpected header '%s'", string(hdr))
+			return false
+		}
+		r.Timestamp = TimeFromUnixMillisecond(timeMs)
 	}
-	r.Timestamp = TimeFromUnixMillisecond(timeMs)
 	r.Name = string(name)
 
 	// we try to re-use r.Data as long as it doesn't grow too much

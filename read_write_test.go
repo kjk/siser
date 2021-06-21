@@ -249,6 +249,43 @@ func TestRecordSerializeSimple2(t *testing.T) {
 	assert.Equal(t, "k2:+3\na\nb\n", s)
 }
 
+func TestWriterNoTimestamp(t *testing.T) {
+	tests := []struct {
+		data string
+		name string
+		exp  string
+	}{
+		{
+			data: "foo",
+			name: "name",
+			exp:  "3 name\nfoo\n",
+		},
+		{
+			data: "foo\n",
+			name: "",
+			exp:  "4\nfoo\n",
+		},
+	}
+	for _, test := range tests {
+		var buf bytes.Buffer
+		w := NewWriter(&buf)
+		w.NoTimestamp = true
+		var tm time.Time
+		_, err := w.Write([]byte(test.data), tm, test.name)
+		assert.Nil(t, err)
+		got := buf.String()
+		assert.Equal(t, test.exp, got)
+
+		rbuf := bufio.NewReader(bytes.NewBufferString(got))
+		r := NewReader(rbuf)
+		r.NoTimestamp = true
+		ok := r.ReadNextData()
+		assert.True(t, ok)
+		assert.Equal(t, string(r.Data), test.data)
+		assert.Equal(t, r.Name, test.name)
+	}
+}
+
 func TestRecordSerializeSimple3(t *testing.T) {
 	var r Record
 	r.Write("long key", largeValue)
