@@ -16,5 +16,7 @@ jobs:
       - name: Test
         run: go test -v ./...
 
-      - name: Run staticcheck
-        run: ./s/ci_static_check.sh
+      - name: Staticcheck
+        run: |
+          go get -u honnef.co/go/tools/cmd/staticcheck
+          staticcheck ./...
