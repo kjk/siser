@@ -1,4 +1,4 @@
-# siser
+# This has moved to https://github.com/kjk/common (package `siser`)
 
 Package `siser` is a Simple Serialization library for Go
 
